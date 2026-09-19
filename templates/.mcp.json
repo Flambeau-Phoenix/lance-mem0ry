@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "project-memory": {
+      "url": "http://<MEMORY_MCP_HOST>:8768/mcp"
+    }
+  }
+}

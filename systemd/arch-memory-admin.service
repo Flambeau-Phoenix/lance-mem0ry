@@ -1,0 +1,21 @@
+[Unit]
+Description=Architectural Memory Admin (Streamlit UI)
+After=network.target arch-memory-http.service
+Wants=arch-memory-http.service
+
+[Service]
+Type=simple
+User=lance-memory
+WorkingDirectory=/opt/lance-memory/server
+ExecStart=/opt/lance-memory/.venv/bin/python -m streamlit run admin_app.py --server.port 8767 --server.address 0.0.0.0 --server.headless true --browser.gatherUsageStats false
+Restart=on-failure
+RestartSec=5
+EnvironmentFile=-/etc/lance-memory/admin.env
+Environment=PROJECT_MEMORIES_ROOT=/opt/lance-memory/project_memories
+Environment=PROJECT_MEMORY_PROJECTS=default
+Environment=PROJECT_MEMORY=default
+Environment=OLLAMA_HOST=http://127.0.0.1:11434
+Environment=ARCH_MEMORY_HTTP_URL=http://127.0.0.1:8768/mcp
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,19 @@
+[Unit]
+Description=LanceMemory Nightly Maintenance Pass
+After=network.target
+
+[Service]
+Type=oneshot
+User=lance-memory
+WorkingDirectory=/opt/lance-memory
+Environment=PROJECT_MEMORIES_ROOT=/opt/lance-memory/project_memories
+Environment=PROJECT_MEMORY_PROJECTS=default
+Environment=PROJECT_MEMORY=default
+Environment=OLLAMA_HOST=http://127.0.0.1:11434
+Environment=PYTHONPATH=/opt/lance-memory/src
+ExecStart=/opt/lance-memory/.venv/bin/python /opt/lance-memory/server/scripts/nightly_maintenance.py
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

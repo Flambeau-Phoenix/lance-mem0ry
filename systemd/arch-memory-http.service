@@ -1,0 +1,22 @@
+[Unit]
+Description=Architectural Memory FastMCP Streamable HTTP Service
+After=network.target ollama.service
+
+[Service]
+Type=simple
+User=lance-memory
+WorkingDirectory=/opt/lance-memory/server
+ExecStart=/opt/lance-memory/.venv/bin/python /opt/lance-memory/server/memory_server.py
+Restart=always
+RestartSec=5
+Environment=PROJECT_MEMORIES_ROOT=/opt/lance-memory/project_memories
+Environment=PROJECT_MEMORY_PROJECTS=default
+Environment=OLLAMA_HOST=http://127.0.0.1:11434
+Environment=PROJECT_MEMORY=default
+Environment=ARCH_MEMORY_TRANSPORT=http
+Environment=ARCH_MEMORY_HOST=0.0.0.0
+Environment=ARCH_MEMORY_PORT=8768
+Environment=FASTMCP_STATELESS_HTTP=true
+
+[Install]
+WantedBy=multi-user.target
