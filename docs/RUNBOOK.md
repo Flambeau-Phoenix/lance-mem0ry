@@ -12,8 +12,8 @@ placeholders below.
 ```
 Your host
 ├── ollama.service              (embeddings: nomic-embed-text, :11434)
-├── arch-memory-http.service    (FastMCP HTTP, :8768) — 5 MCP tools + /health
-├── arch-memory-admin.service   (Streamlit admin console, :8767) — optional
+├── lance-memory-http.service    (FastMCP HTTP, :8768) — 5 MCP tools + /health
+├── lance-memory-admin.service   (Streamlit admin console, :8767) — optional
 └── lance-memory-maintenance.timer  (nightly dedup/expiry sweep)
 
 Storage: PROJECT_MEMORIES_ROOT/<project>/  (one LanceDB dir per project)
@@ -23,16 +23,16 @@ Storage: PROJECT_MEMORIES_ROOT/<project>/  (one LanceDB dir per project)
 
 ```bash
 # Status
-systemctl status arch-memory-http.service arch-memory-admin.service lance-memory-maintenance.timer
+systemctl status lance-memory-http.service lance-memory-admin.service lance-memory-maintenance.timer
 
 # Health check
 curl -s http://<host>:8768/health | jq .
 
 # Restart
-sudo systemctl restart arch-memory-http.service
+sudo systemctl restart lance-memory-http.service
 
 # Logs
-journalctl -u arch-memory-http.service -f
+journalctl -u lance-memory-http.service -f
 ```
 
 ## 3. Using memories
@@ -145,9 +145,9 @@ a second LanceDB root or hardcode the project name into the server.
 | `PROJECT_MEMORY` | your default project | Fallback when a caller omits one |
 | `PROJECT_MEMORY_PROJECTS` | optional | Comma-separated projects to pre-seed |
 | `OLLAMA_HOST` | `http://127.0.0.1:11434` | Embedding service |
-| `ARCH_MEMORY_TRANSPORT` | `http` | FastMCP transport |
+| `LANCE_MEMORY_TRANSPORT` | `http` | FastMCP transport |
 | `ARCH_MEMORY_HOST` | `0.0.0.0` | Service bind host |
-| `ARCH_MEMORY_PORT` | `8768` | HTTP port |
+| `LANCE_MEMORY_PORT` | `8768` | HTTP port |
 | `FASTMCP_STATELESS_HTTP` | `true` | Compatibility for stateless clients |
 | `EXTRACTION_LLM_URL` | optional | OpenAI-compatible proxy for fact extraction |
 | `EXTRACTION_LLM_MODEL` | optional | Extraction model name |
@@ -160,7 +160,7 @@ a second LanceDB root or hardcode the project name into the server.
 3. If writes fail, verify the project name and filesystem permissions on `PROJECT_MEMORIES_ROOT`.
 4. If recall is empty, try `search_type="recent"` and confirm records are `status="active"`.
 5. If embedding dimensions differ from 768, stop writes and verify the `nomic-embed-text` model is pulled.
-6. Inspect `journalctl -u arch-memory-http.service` before restarting.
+6. Inspect `journalctl -u lance-memory-http.service` before restarting.
 
 ## 9. Disaster recovery
 
@@ -174,7 +174,7 @@ tar -czf backup_$(date -u +%Y%m%dT%H%M%SZ).tar.gz -C /opt/lance-memory project_m
 Rollback:
 
 ```bash
-sudo systemctl stop arch-memory-http.service
+sudo systemctl stop lance-memory-http.service
 tar -xzf backup_<timestamp>.tar.gz -C /opt/lance-memory
-sudo systemctl start arch-memory-http.service
+sudo systemctl start lance-memory-http.service
 ```

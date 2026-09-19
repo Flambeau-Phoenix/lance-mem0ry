@@ -38,7 +38,7 @@ from memory_server import (  # noqa: E402
 )
 
 ROOT = Path(__file__).resolve().parent
-BACKUP_ROOT = Path(os.environ.get("ARCH_MEMORY_BACKUP_ROOT", str(ROOT / "backups")))
+BACKUP_ROOT = Path(os.environ.get("LANCE_MEMORY_BACKUP_ROOT", os.environ.get("ARCH_MEMORY_BACKUP_ROOT", str(ROOT / "backups"))))
 
 
 def _projects(value: str) -> list[str]:
@@ -142,7 +142,7 @@ def cmd_status(_args: argparse.Namespace) -> int:
         "root": str(memories_root()),
         "ollama": OLLAMA_HOST,
         "model": EMBED_MODEL,
-        "units": {name: _unit_state(name) for name in ("arch-memory.service", "arch-memory-http.service", "arch-memory-admin.service")},
+        "units": {name: _unit_state(name) for name in ("lance-memory-http.service", "lance-memory-admin.service")},
         "projects": [audit_project(name) for name in _projects("")],
     }
     print(json.dumps(payload, indent=2))

@@ -36,18 +36,18 @@ from memory_server import (
     rebuild_fts,
 )
 
-SSE_URL = os.environ.get("ARCH_MEMORY_SSE_URL", "")
-HTTP_URL = os.environ.get("ARCH_MEMORY_HTTP_URL", "http://127.0.0.1:8768/mcp")
+SSE_URL = os.environ.get("LANCE_MEMORY_SSE_URL", os.environ.get("ARCH_MEMORY_SSE_URL", ""))
+HTTP_URL = os.environ.get("LANCE_MEMORY_HTTP_URL", os.environ.get("ARCH_MEMORY_HTTP_URL", "http://127.0.0.1:8768/mcp"))
 SERVICE_UNITS = (
-    "arch-memory-http.service",
-    "arch-memory-admin.service",
+    "lance-memory-http.service",
+    "lance-memory-admin.service",
 )
 
 # Extended entity types including Mem0 rules & directives
 EXTENDED_ENTITY_TYPES = ("Rule", "Directive", "Preference", "Hook", "UI Element", "Protocol", "State Schema", "Config", "General")
 
 st.set_page_config(
-    page_title="LanceDB Memory & Rules Studio",
+    page_title="Lance Memory (lance-mem0ry) Studio",
     page_icon="🧠",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -140,7 +140,7 @@ def extraction_llm_status() -> tuple[bool, str]:
 def journal(minutes: int = 15, lines: int = 150) -> str:
     try:
         result = subprocess.run(
-            ["journalctl", "-u", "arch-memory-http.service", "-u", "arch-memory-admin.service", f"--since=-{minutes} minutes", "-n", str(lines), "--no-pager", "-o", "short-iso"],
+            ["journalctl", "-u", "lance-memory-http.service", "-u", "lance-memory-admin.service", f"--since=-{minutes} minutes", "-n", str(lines), "--no-pager", "-o", "short-iso"],
             capture_output=True,
             text=True,
             timeout=8,

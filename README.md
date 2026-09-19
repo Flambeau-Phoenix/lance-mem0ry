@@ -1,4 +1,4 @@
-# LanceMemory
+# Lance Memory (lance-mem0ry)
 
 Persistent, project-scoped memory for AI agents, backed by LanceDB and local
 Ollama embeddings. Ships as a Python library (`lance_memory`) and a FastMCP
@@ -36,7 +36,7 @@ lance-memory-oss/
 ├── templates/                 # Drop into any repo to wire up an agent:
 │   ├── .mcp.json               #   MCP endpoint config
 │   ├── AGENTS.md                #   Agent governance charter
-│   └── skills/arch-memory-governance/SKILL.md
+│   └── skills/lance-memory-governance/SKILL.md
 ├── docs/
 │   ├── MEMORY_SYSTEM_REFERENCE.md  # Full tool + schema reference
 │   └── RUNBOOK.md                  # Generic operational runbook
@@ -64,8 +64,8 @@ ollama serve
 ```bash
 export PROJECT_MEMORY=my-project
 export PROJECT_MEMORIES_ROOT=./project_memories
-export ARCH_MEMORY_TRANSPORT=http
-export ARCH_MEMORY_PORT=8768
+export LANCE_MEMORY_TRANSPORT=http
+export LANCE_MEMORY_PORT=8768
 python server/memory_server.py
 ```
 
@@ -75,7 +75,7 @@ Copy the triplet from `templates/` into your project repository:
 
 - `.mcp.json` — replace `<MEMORY_MCP_HOST>` with your server host
 - `AGENTS.md` — governance rules (before/during/after lifecycle)
-- `skills/arch-memory-governance/SKILL.md` — agent skill definition
+- `skills/lance-memory-governance/SKILL.md` — agent skill definition
 
 The project partition defaults to your repository-root folder name unless the
 workspace documents an explicit alias.
@@ -109,9 +109,9 @@ See `docs/MEMORY_SYSTEM_REFERENCE.md` for full parameter and routing details.
 | `PROJECT_MEMORY` | none | Default project when a caller omits one |
 | `PROJECT_MEMORY_PROJECTS` | discovered directories | Optional comma-separated projects to pre-seed |
 | `OLLAMA_HOST` | `http://127.0.0.1:11434` | Ollama embedding endpoint |
-| `ARCH_MEMORY_TRANSPORT` | `stdio` | FastMCP transport (`http`, `sse`, or `stdio`) |
+| `LANCE_MEMORY_TRANSPORT` | `stdio` | FastMCP transport (`http`, `sse`, or `stdio`) |
 | `ARCH_MEMORY_HOST` | `127.0.0.1` | Bind host |
-| `ARCH_MEMORY_PORT` | `8768` | Bind port |
+| `LANCE_MEMORY_PORT` | `8768` | Bind port |
 | `FASTMCP_STATELESS_HTTP` | `false` | Permit stateless HTTP clients when `true` |
 | `EXTRACTION_LLM_URL` | none | Optional OpenAI-compatible proxy for fact extraction |
 | `EXTRACTION_LLM_MODEL` | `local-model` | Optional extraction model name |

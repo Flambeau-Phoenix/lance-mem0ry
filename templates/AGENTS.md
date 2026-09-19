@@ -1,6 +1,6 @@
-# Autonomous Project Memory Charter & Governance
+# Autonomous Lance Memory (lance-mem0ry) Charter & Governance
 
-All agents use the **`arch-memory-governance`** skill and the `project-memory`
+All agents use the **`lance-memory-governance`** skill and the `lance-memory`
 FastMCP backend (**5 tools only**). Tip embeddings: Ollama `nomic-embed-text`
 (768-dim).
 

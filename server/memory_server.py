@@ -1,4 +1,4 @@
-"""Architectural memory MCP — named project LanceDB + Ollama nomic-embed-text.
+"""Lance Memory (lance-mem0ry) FastMCP — named project LanceDB + Ollama nomic-embed-text.
 
 Durable Memory v2: the v1 columns (text/category/symbol/verified/created_at) are
 retained verbatim because admin_app.py, admin_cli.py, and any external AST or
@@ -574,6 +574,92 @@ def get_active_row_impl(memory_id: str, project: Optional[str] = None) -> dict:
     return rows[0]
 
 
+def update_record_impl(
+    memory_id: str,
+    patch_data: dict,
+    project: Optional[str] = None,
+) -> dict:
+    """Update an existing record in the primary 'records' table."""
+    proj = assert_write_allowed(project)
+    table = get_table(proj)
+    existing = get_active_row_impl(memory_id, project=proj)
+    
+    values: dict[str, Any] = {"updated_at": _iso_now()}
+    if "text" in patch_data and patch_data["text"] is not None:
+        new_text = str(patch_data["text"]).strip()
+        if new_text:
+            values["text"] = new_text
+            values["vector"] = embed_text(new_text)
+
+    if "category" in patch_data and patch_data["category"] is not None:
+        cat = str(patch_data["category"]).strip()
+        values["category"] = cat
+        curr_tags = list(existing.get("tags") or [])
+        if cat and cat not in curr_tags:
+            curr_tags.append(cat)
+            values["tags"] = curr_tags
+
+    if "bucket" in patch_data and patch_data["bucket"] is not None:
+        b = str(patch_data["bucket"]).strip()
+        if b not in BUCKETS:
+            raise ValueError(f"bucket={b!r} not in {BUCKETS}")
+        values["bucket"] = b
+
+    if "verified" in patch_data and patch_data["verified"] is not None:
+        values["verified"] = bool(patch_data["verified"])
+
+    if "symbol" in patch_data and patch_data["symbol"] is not None:
+        values["symbol"] = str(patch_data["symbol"]).strip()
+
+    if "tags" in patch_data and patch_data["tags"] is not None:
+        tag_list = [str(t) for t in patch_data["tags"] if str(t).strip()]
+        values["tags"] = tag_list
+
+    if "status" in patch_data and patch_data["status"] is not None:
+        st = str(patch_data["status"]).strip()
+        if st not in STATUSES:
+            raise ValueError(f"status={st!r} not in {STATUSES}")
+        values["status"] = st
+
+    if "entity_type" in patch_data and patch_data["entity_type"] is not None:
+        values["entity_type"] = str(patch_data["entity_type"]).strip()
+
+    mid_safe = _sql_str(memory_id)
+    table.update(
+        where=f"memory_id = {mid_safe} OR record_id = {mid_safe}",
+        values=values,
+    )
+    if "text" in values:
+        try:
+            _ensure_fts(table)
+        except Exception:
+            pass
+
+    updated = dict(existing)
+    updated.update(values)
+    return _row_public(updated)
+
+
+def purge_project_impl(project: Optional[str] = None) -> dict:
+    """Purge all records in a project partition."""
+    proj = assert_write_allowed(project)
+    table = get_table(proj)
+    count = table.count_rows()
+    try:
+        table.delete("1=1")
+    except Exception:
+        p = project_db_path(proj)
+        db = lancedb.connect(str(p))
+        try:
+            db.drop_table(TABLE_NAME)
+        except Exception:
+            pass
+        invalidate_table(proj)
+        get_table(proj)
+    invalidate_table(proj)
+    return {"project": proj, "purged_records": count, "status": "purged"}
+
+
 def promote_to_fact_impl(
     memory_id: str,
     project: str,
@@ -738,7 +824,7 @@ def _format_handoff_text(text: str, metadata: dict) -> str:
 def build_mcp():
     if FastMCP is None:
         raise RuntimeError("fastmcp not installed")
-    mcp = FastMCP("project-memory")
+    mcp = FastMCP("lance-memory")
 
     # --- Custom HTTP Route for lightweight client health checks ---
     @mcp.custom_route("/health", methods=["GET"])
@@ -930,46 +1016,23 @@ def build_mcp():
 
         if act == "purge":
             confirm = bool(patch.get("confirm", False))
-            user_id = patch.get("user_id")
-            agent_id = patch.get("agent_id")
-            run_id = patch.get("run_id")
-            app_id = patch.get("app_id")
-            secondary = {k: v for k, v in {
-                "user_id": user_id, "agent_id": agent_id, "run_id": run_id, "app_id": app_id,
-            }.items() if v}
-            if not secondary and not confirm:
+            if not confirm:
                 raise ValueError(
-                    "modify_memory action=purge with only project requires "
-                    "patch_data.confirm=True"
+                    "modify_memory action=purge requires patch_data.confirm=True "
+                    "(this deletes all records in the project partition)"
                 )
-            lm = _get_lm(proj)
             return {
                 "action": "purge",
-                "result": lm.delete_all(
-                    project=resolve_project(proj),
-                    user_id=user_id,
-                    agent_id=agent_id,
-                    run_id=run_id,
-                    app_id=app_id,
-                ),
+                "result": purge_project_impl(proj),
             }
 
         if not mid:
             raise ValueError("memory_id is required unless action=purge")
 
         if act == "update":
-            lm = _get_lm(proj)
-            text = patch.get("text")
-            meta = {k: v for k, v in patch.items() if k not in ("text", "expiration_date")}
             return {
                 "action": "update",
-                "result": lm.update(
-                    mid,
-                    project=resolve_project(proj),
-                    text=text,
-                    metadata=meta or None,
-                    expiration_date=patch.get("expiration_date"),
-                ),
+                "result": update_record_impl(mid, patch, project=proj),
             }
 
         if act == "delete":
@@ -1033,7 +1096,38 @@ def build_mcp():
         if act == "flush":
             packet = _sessions[sid].handoff(reason=str(data.get("reason") or "session_end"))
             del _sessions[sid]
-            return {"status": "flushed_to_long_term", "packet": packet}
+            flushed_ids = []
+            facts = packet.get("facts") or []
+            summary = packet.get("summary") or ""
+            for fact in facts:
+                if isinstance(fact, str) and fact.strip():
+                    rec = record_discovery_impl(
+                        fact.strip(),
+                        project=proj,
+                        category="key_facts",
+                        verified=True,
+                        bucket="fact",
+                        tags=["session_extracted"],
+                        source_type="agent",
+                    )
+                    flushed_ids.append(rec.get("memory_id"))
+            if summary:
+                rec_handoff = record_discovery_impl(
+                    f"Session handoff: {summary}",
+                    project=proj,
+                    category="session_handoff",
+                    verified=False,
+                    bucket="state",
+                    tags=["handoff", "session_handoff"],
+                    source_type="agent",
+                )
+                flushed_ids.append(rec_handoff.get("memory_id"))
+            return {
+                "status": "flushed_to_long_term",
+                "packet": packet,
+                "records_committed": len(flushed_ids),
+                "committed_ids": flushed_ids,
+            }
 
         raise ValueError(f"unknown action={action!r}; use begin|read|write|flush")
 
@@ -1067,12 +1161,41 @@ def build_mcp():
 
         if act == "maintenance_scan":
             proj = resolve_project(project_id)
-            lm = _get_lm(proj)
-            mh = MaintenanceHarness(lm)
+            table = get_table(proj)
+            active_rows = table.search().where("status = 'active'").limit(1000).to_list()
+            duplicates = []
+            threshold = float((filters or {}).get("threshold", 0.03) if "filters" in locals() else 0.03)
+            import numpy as np
+            for i in range(len(active_rows)):
+                v_i = active_rows[i].get("vector")
+                if v_i is None:
+                    continue
+                v_i = np.array(v_i, dtype=float)
+                norm_i = np.linalg.norm(v_i)
+                if norm_i == 0:
+                    continue
+                for j in range(i + 1, len(active_rows)):
+                    v_j = active_rows[j].get("vector")
+                    if v_j is None:
+                        continue
+                    v_j = np.array(v_j, dtype=float)
+                    norm_j = np.linalg.norm(v_j)
+                    if norm_j == 0:
+                        continue
+                    cos_sim = float(np.dot(v_i, v_j) / (norm_i * norm_j))
+                    cos_dist = 1.0 - cos_sim
+                    if cos_dist <= threshold:
+                        duplicates.append({
+                            "id_a": active_rows[i].get("memory_id") or active_rows[i].get("record_id"),
+                            "text_a": active_rows[i].get("text"),
+                            "id_b": active_rows[j].get("memory_id") or active_rows[j].get("record_id"),
+                            "text_b": active_rows[j].get("text"),
+                            "cosine_distance": cos_dist,
+                        })
             return {
                 "project": proj,
-                "duplicates": mh.scan_duplicates(project=proj, threshold=0.03),
-                "expired": mh.scan_expired(project=proj),
+                "duplicates": duplicates,
+                "active_rows_scanned": len(active_rows),
                 "status": "completed",
             }
 
@@ -1140,31 +1263,40 @@ def main(argv: Optional[list[str]] = None) -> None:
         return
 
     mcp = build_mcp()
-    transport = os.environ.get("ARCH_MEMORY_TRANSPORT", "sse").strip().lower() or "sse"
-    host = os.environ.get("ARCH_MEMORY_HOST", "0.0.0.0").strip() or "0.0.0.0"
-    port = int(os.environ.get("ARCH_MEMORY_PORT", "8766") or "8766")
+    transport = os.environ.get(
+        "LANCE_MEMORY_TRANSPORT",
+        os.environ.get("ARCH_MEMORY_TRANSPORT", "http")
+    ).strip().lower() or "http"
+    host = os.environ.get(
+        "LANCE_MEMORY_HOST",
+        os.environ.get("ARCH_MEMORY_HOST", "0.0.0.0")
+    ).strip() or "0.0.0.0"
+    port = int(
+        os.environ.get("LANCE_MEMORY_PORT", os.environ.get("ARCH_MEMORY_PORT", "8768"))
+        or "8768"
+    )
     if not hasattr(mcp, "run"):
         raise RuntimeError("FastMCP instance has no run()")
     if transport == "stdio":
-        print(f"Starting project-memory stdio (default project={active_project()})", file=sys.stderr)
+        print(f"Starting lance-memory stdio (default project={active_project()})", file=sys.stderr)
         mcp.run(transport="stdio")
     elif transport in ("http", "streamable-http"):
         print(
-            f"Starting project-memory streamable HTTP on http://{host}:{port}/mcp "
+            f"Starting lance-memory streamable HTTP on http://{host}:{port}/mcp "
             f"(default project={active_project()}, root={memories_root()})",
             file=sys.stderr,
         )
         mcp.run(transport=transport, host=host, port=port)
     elif transport == "sse":
         print(
-            f"Starting project-memory SSE on http://{host}:{port}/sse "
+            f"Starting lance-memory SSE on http://{host}:{port}/sse "
             f"(default project={active_project()}, root={memories_root()})",
             file=sys.stderr,
         )
         mcp.run(transport=transport, host=host, port=port)
     else:
         raise ValueError(
-            "ARCH_MEMORY_TRANSPORT must be stdio, sse, http, or streamable-http; "
+            "LANCE_MEMORY_TRANSPORT / ARCH_MEMORY_TRANSPORT must be stdio, sse, http, or streamable-http; "
             f"got {transport!r}"
         )
 

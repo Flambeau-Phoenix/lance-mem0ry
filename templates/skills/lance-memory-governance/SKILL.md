@@ -1,12 +1,12 @@
 ---
-name: arch-memory-governance
+name: lance-memory-governance
 description: Universal project-scoped engineering memory via FastMCP and LanceDB. Five routed tools — recall, commit_memory, modify_memory, sync_session_buffer, inspect_memory_system.
 compatibility: fastmcp, cursor, opencode, codex, antigravity
 ---
 
-# Architectural Memory Governance
+# Lance Memory Governance (lance-mem0ry)
 
-Use the `project-memory` MCP server (5 tools only). Connection details belong in
+Use the `lance-memory` MCP server (5 tools only). Connection details belong in
 `.mcp.json`. Tip embeddings: Ollama `nomic-embed-text` (768-dim).
 
 ## 1. Project resolution

@@ -1,7 +1,7 @@
 [Unit]
-Description=Architectural Memory Admin (Streamlit UI)
-After=network.target arch-memory-http.service
-Wants=arch-memory-http.service
+Description=Lance Memory Admin (Streamlit UI)
+After=network.target lance-memory-http.service
+Wants=lance-memory-http.service
 
 [Service]
 Type=simple
@@ -15,7 +15,7 @@ Environment=PROJECT_MEMORIES_ROOT=/opt/lance-memory/project_memories
 Environment=PROJECT_MEMORY_PROJECTS=default
 Environment=PROJECT_MEMORY=default
 Environment=OLLAMA_HOST=http://127.0.0.1:11434
-Environment=ARCH_MEMORY_HTTP_URL=http://127.0.0.1:8768/mcp
+Environment=LANCE_MEMORY_HTTP_URL=http://127.0.0.1:8768/mcp
 
 [Install]
 WantedBy=multi-user.target

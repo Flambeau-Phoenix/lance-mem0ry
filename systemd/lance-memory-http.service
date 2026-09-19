@@ -1,5 +1,5 @@
 [Unit]
-Description=Architectural Memory FastMCP Streamable HTTP Service
+Description=Lance Memory FastMCP Streamable HTTP Service
 After=network.target ollama.service
 
 [Service]
@@ -13,9 +13,9 @@ Environment=PROJECT_MEMORIES_ROOT=/opt/lance-memory/project_memories
 Environment=PROJECT_MEMORY_PROJECTS=default
 Environment=OLLAMA_HOST=http://127.0.0.1:11434
 Environment=PROJECT_MEMORY=default
-Environment=ARCH_MEMORY_TRANSPORT=http
-Environment=ARCH_MEMORY_HOST=0.0.0.0
-Environment=ARCH_MEMORY_PORT=8768
+Environment=LANCE_MEMORY_TRANSPORT=http
+Environment=LANCE_MEMORY_HOST=0.0.0.0
+Environment=LANCE_MEMORY_PORT=8768
 Environment=FASTMCP_STATELESS_HTTP=true
 
 [Install]

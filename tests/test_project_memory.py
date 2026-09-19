@@ -1,4 +1,5 @@
 from __future__ import annotations
+from pathlib import Path
 
 import pytest
 
@@ -73,3 +74,68 @@ def test_session_handoff_is_project_scoped(memory, monkeypatch):
 def test_scope_key_requires_project():
     with pytest.raises(ValueError, match="project is required"):
         scope_key({"agent_id": "coder"})
+
+
+def test_templates_and_services_unified():
+    # Verify no arch-memory in templates or systemd
+    repo_root = Path(__file__).resolve().parent.parent
+    systemd_files = list((repo_root / "systemd").glob("*"))
+    systemd_names = [f.name for f in systemd_files]
+    assert "lance-memory-http.service" in systemd_names
+    assert "lance-memory-admin.service" in systemd_names
+    assert "arch-memory-http.service" not in systemd_names
+    assert "arch-memory-admin.service" not in systemd_names
+
+    skill_file = repo_root / "templates" / "skills" / "lance-memory-governance" / "SKILL.md"
+    assert skill_file.exists()
+    assert not (repo_root / "templates" / "skills" / "arch-memory-governance").exists()
+    
+    skill_content = skill_file.read_text(encoding="utf-8")
+    assert "name: lance-memory-governance" in skill_content
+    assert "arch-memory" not in skill_content.lower()
+
+
+def test_server_record_update_and_purge(tmp_path, monkeypatch):
+    monkeypatch.setenv("PROJECT_MEMORIES_ROOT", str(tmp_path))
+    import server.memory_server as ms
+    monkeypatch.setattr(ms, "embed_text", lambda text: [0.1] * 768)
+
+    # 1. Create discovery record
+    rec = ms.record_discovery_impl(
+        "Initial technical specification.",
+        project="TestProj",
+        category="architectural_decisions",
+        verified=True,
+        bucket="decision",
+    )
+    mid = rec["memory_id"]
+    assert rec["text"] == "Initial technical specification."
+    assert rec["category"] == "architectural_decisions"
+
+    # 2. Update record via update_record_impl
+    updated = ms.update_record_impl(
+        mid,
+        patch_data={
+            "text": "Updated technical specification with ratified protocol.",
+            "category": "key_facts",
+            "bucket": "fact",
+        },
+        project="TestProj",
+    )
+    assert updated["memory_id"] == mid
+    assert updated["text"] == "Updated technical specification with ratified protocol."
+    assert updated["category"] == "key_facts"
+    assert updated["bucket"] == "fact"
+
+    # 3. Retrieve and verify update took effect in records table
+    row = ms.get_active_row_impl(mid, project="TestProj")
+    assert row["text"] == "Updated technical specification with ratified protocol."
+    assert row["category"] == "key_facts"
+
+    # 4. Test purge
+    purge_res = ms.purge_project_impl(project="TestProj")
+    assert purge_res["status"] == "purged"
+    assert purge_res["purged_records"] == 1
+
+    tbl = ms.get_table("TestProj")
+    assert tbl.count_rows() == 0
