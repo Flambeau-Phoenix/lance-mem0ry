@@ -16,8 +16,8 @@ server exposing exactly **five** agent-facing tools.
 - **Five-tool MCP surface** — `recall`, `commit_memory`, `modify_memory`,
   `sync_session_buffer`, `inspect_memory_system`. No 20+ tool wall for the
   agent to pick from; each tool routes internally by parameter.
-- **Optional admin console** — a Streamlit app for browsing, editing, and
-  auditing partitions.
+- **Native Web Control Panel** — Access `http://localhost:8768/` or `http://localhost:8768/panel` directly in your browser. Maintain, search, inline-edit, promote blueprints, and resolve duplicate candidate memories with zero extra server processes or npm builds.
+- **Optional Streamlit console** — an alternative Streamlit app (`admin_app.py`) for legacy workflows.
 
 ## Package layout
 
@@ -25,6 +25,7 @@ server exposing exactly **five** agent-facing tools.
 lance-memory-oss/
 ├── src/lance_memory/          # Core library (LanceMemory, SessionMemory, ...)
 ├── server/
+│   ├── static/index.html      # Built-in Web Control Panel UI
 │   ├── memory_server.py       # FastMCP server: recall / commit_memory /
 │   │                          #   modify_memory / sync_session_buffer /
 │   │                          #   inspect_memory_system + /health route

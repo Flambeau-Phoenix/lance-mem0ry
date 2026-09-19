@@ -826,11 +826,197 @@ def build_mcp():
         raise RuntimeError("fastmcp not installed")
     mcp = FastMCP("lance-memory")
 
-    # --- Custom HTTP Route for lightweight client health checks ---
-    @mcp.custom_route("/health", methods=["GET"])
-    async def health_endpoint(request):
-        from starlette.responses import JSONResponse
+    # --- Web Control Panel & REST API Routes ---
+    from starlette.responses import HTMLResponse, JSONResponse
+
+    def _load_web_panel_html() -> str:
+        panel_path = _SCRIPT_DIR / "static" / "index.html"
+        if panel_path.exists():
+            return panel_path.read_text(encoding="utf-8")
+        return "<html><body><h1>Lance Memory Control Panel</h1><p>Static index.html not found.</p></body></html>"
+
+    @mcp.custom_route("/", methods=["GET"])
+    @mcp.custom_route("/panel", methods=["GET"])
+    async def web_panel_page(request):
+        return HTMLResponse(_load_web_panel_html())
+
+    @mcp.custom_route("/api/health", methods=["GET"])
+    async def api_health(request):
         return JSONResponse(_health_payload())
+
+    @mcp.custom_route("/api/projects", methods=["GET"])
+    async def api_projects(request):
+        root = memories_root()
+        configured = set(KNOWN_PROJECTS)
+        discovered = {p.name for p in root.iterdir() if p.is_dir() and not p.name.startswith(".")} if root.is_dir() else set()
+        all_projects = sorted(configured | discovered)
+        if not all_projects:
+            all_projects = ["FlamBot", "SolarFlare", "EventHorizon", "FareverAPI"]
+        results = []
+        for p in all_projects:
+            try:
+                table = get_table(p)
+                cnt = table.count_rows()
+                act = len(table.search().where("status = 'active'").limit(10_000).to_list())
+            except Exception:
+                cnt, act = 0, 0
+            results.append({"name": p, "total_rows": cnt, "active_rows": act})
+        return JSONResponse({"projects": results})
+
+    @mcp.custom_route("/api/memories", methods=["GET"])
+    async def api_get_memories(request):
+        proj = resolve_project(request.query_params.get("project"))
+        q = (request.query_params.get("query") or "").strip()
+        st = (request.query_params.get("search_type") or "semantic").strip().lower()
+        limit = min(int(request.query_params.get("limit") or 50), 200)
+        bucket = request.query_params.get("bucket")
+        category = request.query_params.get("category")
+        status_req = (request.query_params.get("status") or "active").strip().lower()
+        verified_req = request.query_params.get("verified")
+
+        table = get_table(proj)
+        total_cnt = table.count_rows()
+        active_cnt = len(table.search().where("status = 'active'").limit(10_000).to_list())
+        bp_cnt = len(table.search().where("verified = false AND status = 'active'").limit(10_000).to_list())
+        archived_cnt = len(table.search().where("status != 'active'").limit(10_000).to_list())
+
+        stats_obj = {
+            "total_rows": total_cnt,
+            "active_rows": active_cnt,
+            "blueprints": bp_cnt,
+            "archived": archived_cnt,
+            "disk_bytes": project_stats(proj).get("disk_bytes", 0),
+        }
+
+        if q and st == "semantic":
+            buckets = [bucket] if bucket else None
+            rows = recall_impl(q, project=proj, buckets=buckets, limit=limit, status=None if status_req == "all" else status_req)
+        elif q and st == "symbol":
+            rows = search_by_symbol_impl(q, limit=limit, project=proj)
+        else:
+            # Query table with filters
+            clauses = []
+            if status_req != "all":
+                clauses.append(f"status = '{status_req}'")
+            if bucket:
+                clauses.append(f"bucket = '{bucket}'")
+            if category:
+                clauses.append(f"category = '{category}'")
+            if verified_req in ("true", "false"):
+                clauses.append(f"verified = {verified_req}")
+            pred = " AND ".join(clauses) if clauses else "1=1"
+            try:
+                raw_rows = table.search().where(pred).limit(limit).to_list()
+                rows = [_row_public(r) for r in raw_rows]
+            except Exception as e:
+                rows = []
+
+        return JSONResponse({"rows": rows, "stats": stats_obj, "project": proj})
+
+    @mcp.custom_route("/api/memories", methods=["POST"])
+    async def api_create_memory(request):
+        try:
+            body = await request.json()
+            proj = resolve_project(body.get("project"))
+            text = (body.get("text") or "").strip()
+            ctype = body.get("type", "discovery")
+            meta = dict(body.get("metadata") or {})
+
+            if ctype == "promotion":
+                sid = str(meta.get("supersedes_id") or "").strip()
+                if not sid:
+                    return JSONResponse({"error": "metadata.supersedes_id required"}, status_code=400)
+                rec = promote_to_fact_impl(sid, project=proj, category=str(meta.get("category") or "key_facts"), text=text)
+            else:
+                rec = record_discovery_impl(
+                    text,
+                    symbol=str(meta.get("symbol") or ""),
+                    category=str(meta.get("category") or "general"),
+                    project=proj,
+                    verified=bool(meta.get("verified", True)),
+                    bucket=str(meta.get("bucket") or ""),
+                    tags=meta.get("tags"),
+                    agent_id=str(meta.get("agent_id") or ""),
+                    run_id=str(meta.get("run_id") or ""),
+                    source_type="user",
+                )
+            return JSONResponse({"status": "success", "record": rec})
+        except Exception as e:
+            return JSONResponse({"error": str(e)}, status_code=400)
+
+    @mcp.custom_route("/api/memories/{memory_id}", methods=["PUT"])
+    async def api_update_memory(request):
+        try:
+            memory_id = request.path_params["memory_id"]
+            body = await request.json()
+            proj = resolve_project(body.get("project"))
+            patch = dict(body.get("patch") or {})
+            updated = update_record_impl(memory_id, patch, project=proj)
+            return JSONResponse({"status": "success", "record": updated})
+        except Exception as e:
+            return JSONResponse({"error": str(e)}, status_code=400)
+
+    @mcp.custom_route("/api/memories/{memory_id}/status", methods=["POST"])
+    async def api_set_status(request):
+        try:
+            memory_id = request.path_params["memory_id"]
+            body = await request.json()
+            proj = resolve_project(body.get("project"))
+            status = body.get("status")
+            res = set_status_impl(memory_id, status, project=proj)
+            return JSONResponse({"status": "success", "result": res})
+        except Exception as e:
+            return JSONResponse({"error": str(e)}, status_code=400)
+
+    @mcp.custom_route("/api/maintenance/scan", methods=["POST"])
+    async def api_maintenance_scan(request):
+        try:
+            body = await request.json()
+            proj = resolve_project(body.get("project"))
+            threshold = float(body.get("threshold", 0.03))
+
+            table = get_table(proj)
+            active_rows = table.search().where("status = 'active'").limit(1000).to_list()
+            duplicates = []
+            import numpy as np
+            for i in range(len(active_rows)):
+                v_i = active_rows[i].get("vector")
+                if v_i is None: continue
+                v_i = np.array(v_i, dtype=float)
+                norm_i = np.linalg.norm(v_i)
+                if norm_i == 0: continue
+                for j in range(i + 1, len(active_rows)):
+                    v_j = active_rows[j].get("vector")
+                    if v_j is None: continue
+                    v_j = np.array(v_j, dtype=float)
+                    norm_j = np.linalg.norm(v_j)
+                    if norm_j == 0: continue
+                    cos_sim = float(np.dot(v_i, v_j) / (norm_i * norm_j))
+                    cos_dist = 1.0 - cos_sim
+                    if cos_dist <= threshold:
+                        duplicates.append({
+                            "id_a": active_rows[i].get("memory_id") or active_rows[i].get("record_id"),
+                            "text_a": active_rows[i].get("text"),
+                            "id_b": active_rows[j].get("memory_id") or active_rows[j].get("record_id"),
+                            "text_b": active_rows[j].get("text"),
+                            "cosine_distance": cos_dist,
+                        })
+            return JSONResponse({"duplicates": duplicates, "active_rows_scanned": len(active_rows)})
+        except Exception as e:
+            return JSONResponse({"error": str(e)}, status_code=400)
+
+    @mcp.custom_route("/api/maintenance/purge", methods=["POST"])
+    async def api_maintenance_purge(request):
+        try:
+            body = await request.json()
+            proj = resolve_project(body.get("project"))
+            if not body.get("confirm"):
+                return JSONResponse({"error": "confirm=true required"}, status_code=400)
+            res = purge_project_impl(proj)
+            return JSONResponse({"status": "success", "result": res})
+        except Exception as e:
+            return JSONResponse({"error": str(e)}, status_code=400)
+
 
     # --- LanceMemory & Session Engine (internal; not exposed as MCP tools) ---
     from lance_memory.memory import LanceMemory

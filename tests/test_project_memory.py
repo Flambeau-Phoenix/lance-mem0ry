@@ -139,3 +139,46 @@ def test_server_record_update_and_purge(tmp_path, monkeypatch):
 
     tbl = ms.get_table("TestProj")
     assert tbl.count_rows() == 0
+
+
+def test_web_panel_routes(tmp_path, monkeypatch):
+    from starlette.testclient import TestClient
+    monkeypatch.setenv('PROJECT_MEMORIES_ROOT', str(tmp_path))
+    import server.memory_server as ms
+    monkeypatch.setattr(ms, 'embed_text', lambda t: [0.05] * 768)
+
+    mcp = ms.build_mcp()
+    client = TestClient(mcp.http_app())
+
+    # 1. Panel page
+    resp = client.get('/panel')
+    assert resp.status_code == 200
+    assert 'Lance Memory' in resp.text
+
+    # 2. API Health
+    resp = client.get('/api/health')
+    assert resp.status_code == 200
+    assert 'status' in resp.json()
+
+    # 3. Create memory
+    resp = client.post('/api/memories', json={
+        'project': 'WebTest',
+        'text': 'Native FastMCP Web Panel is operational.',
+        'type': 'discovery',
+        'metadata': {'category': 'key_facts', 'bucket': 'fact', 'verified': True}
+    })
+    assert resp.status_code == 200
+    mid = resp.json()['record']['memory_id']
+
+    # 4. Query memories
+    resp = client.get('/api/memories?project=WebTest')
+    assert resp.status_code == 200
+    assert len(resp.json()['rows']) == 1
+
+    # 5. Update memory
+    resp = client.put(f'/api/memories/{mid}', json={
+        'project': 'WebTest',
+        'patch': {'text': 'Updated memory via REST API.'}
+    })
+    assert resp.status_code == 200
+    assert resp.json()['record']['text'] == 'Updated memory via REST API.'

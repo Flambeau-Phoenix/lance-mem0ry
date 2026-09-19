@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lance Memory (lance-mem0ry) — Engineering Memory Bank Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #080c14;
+      --bg-surface: #0f172a;
+      --bg-surface-elevated: #162036;
+      --bg-glass: rgba(15, 23, 42, 0.75);
+      --border-subtle: rgba(255, 255, 255, 0.07);
+      --border-strong: rgba(255, 255, 255, 0.14);
+      --border-focus: #38bdf8;
+      
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      
+      --accent-primary: #0ea5e9;
+      --accent-secondary: #6366f1;
+      --accent-gradient: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%);
+      
+      --fact-color: #10b981;
+      --fact-bg: rgba(16, 185, 129, 0.12);
+      --decision-color: #38bdf8;
+      --decision-bg: rgba(56, 189, 248, 0.12);
+      --procedure-color: #a855f7;
+      --procedure-bg: rgba(168, 85, 247, 0.12);
+      --state-color: #f59e0b;
+      --state-bg: rgba(245, 158, 11, 0.12);
+      --danger-color: #f43f5e;
+      --danger-bg: rgba(244, 63, 94, 0.12);
+      
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', Consolas, Monaco, monospace;
+      
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --radius-xl: 18px;
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+      --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(14, 165, 233, 0.1);
+      --shadow-glow: 0 0 25px rgba(14, 165, 233, 0.25);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg-base);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(14, 165, 233, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(99, 102, 241, 0.08) 0%, transparent 40%);
+    }
+
+    /* Top Navigation Header */
+    header {
+      background: var(--bg-glass);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 0.85rem 1.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .logo-cluster {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .logo-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: var(--radius-md);
+      background: var(--accent-gradient);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      box-shadow: var(--shadow-glow);
+    }
+
+    .logo-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .logo-badge {
+      font-size: 0.65rem;
+      font-family: var(--font-mono);
+      padding: 0.15rem 0.4rem;
+      border-radius: var(--radius-sm);
+      background: rgba(14, 165, 233, 0.15);
+      border: 1px solid rgba(14, 165, 233, 0.35);
+      color: var(--accent-primary);
+      font-weight: 600;
+    }
+
+    .header-center {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .project-picker {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 0.4rem 0.85rem;
+      transition: all 0.2s ease;
+    }
+
+    .project-picker:hover {
+      border-color: var(--border-strong);
+    }
+
+    .project-picker label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .project-picker select {
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-weight: 600;
+      font-size: 0.9rem;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .project-picker select option {
+      background: var(--bg-surface-elevated);
+      color: var(--text-primary);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.55rem 1.1rem;
+      border-radius: var(--radius-md);
+      font-size: 0.875rem;
+      font-weight: 600;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      border: 1px solid transparent;
+      outline: none;
+    }
+
+    .btn-primary {
+      background: var(--accent-gradient);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(14, 165, 233, 0.5);
+    }
+
+    .btn-secondary {
+      background: var(--bg-surface);
+      border-color: var(--border-subtle);
+      color: var(--text-primary);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-surface-elevated);
+      border-color: var(--border-strong);
+      transform: translateY(-1px);
+    }
+
+    .btn-danger {
+      background: var(--danger-bg);
+      border-color: rgba(244, 63, 94, 0.3);
+      color: var(--danger-color);
+    }
+
+    .btn-danger:hover {
+      background: var(--danger-color);
+      color: white;
+    }
+
+    .btn-sm {
+      padding: 0.35rem 0.75rem;
+      font-size: 0.75rem;
+    }
+
+    /* Main Container Layout */
+    .app-layout {
+      display: flex;
+      flex: 1;
+      max-width: 1600px;
+      margin: 0 auto;
+      width: 100%;
+      padding: 1.5rem;
+      gap: 1.5rem;
+    }
+
+    /* Sidebar Navigation & Metrics */
+    aside {
+      width: 280px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .metric-card {
+      background: var(--bg-glass);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .metric-card-title {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+
+    .metric-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 0.45rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    .metric-row:last-child {
+      border-bottom: none;
+    }
+
+    .metric-label {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .metric-value {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--text-primary);
+    }
+
+    .nav-tabs {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .nav-tab-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-md);
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: left;
+    }
+
+    .nav-tab-btn:hover {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+    }
+
+    .nav-tab-btn.active {
+      background: var(--bg-surface-elevated);
+      color: var(--accent-primary);
+      border-color: rgba(14, 165, 233, 0.3);
+      box-shadow: 0 0 15px rgba(14, 165, 233, 0.1);
+    }
+
+    /* Main Content Area */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .view-section {
+      display: none;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .view-section.active {
+      display: flex;
+    }
+
+    /* Search & Filter Bar */
+    .search-panel {
+      background: var(--bg-glass);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .search-input-row {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .search-box {
+      flex: 1;
+      position: relative;
+    }
+
+    .search-box input {
+      width: 100%;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 0.75rem 1rem 0.75rem 2.5rem;
+      color: var(--text-primary);
+      font-size: 0.95rem;
+      font-family: var(--font-sans);
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .search-box input:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 0.85rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .search-mode-select {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-primary);
+      border-radius: var(--radius-md);
+      padding: 0.5rem 0.85rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .filter-chips-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .filter-select {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      padding: 0.35rem 0.65rem;
+      outline: none;
+      cursor: pointer;
+    }
+
+    /* Memory Cards Grid */
+    .memories-container {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+
+    .memory-card {
+      background: var(--bg-glass);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .memory-card:hover {
+      border-color: var(--border-strong);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .memory-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .badge-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.2rem 0.55rem;
+      border-radius: var(--radius-sm);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .badge-fact { background: var(--fact-bg); color: var(--fact-color); border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-decision { background: var(--decision-bg); color: var(--decision-color); border: 1px solid rgba(56, 189, 248, 0.3); }
+    .badge-procedure { background: var(--procedure-bg); color: var(--procedure-color); border: 1px solid rgba(168, 85, 247, 0.3); }
+    .badge-state { background: var(--state-bg); color: var(--state-color); border: 1px solid rgba(245, 158, 11, 0.3); }
+    
+    .badge-verified {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(52, 211, 153, 0.3);
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .badge-blueprint {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(251, 191, 36, 0.3);
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .badge-status-superseded {
+      background: rgba(100, 116, 139, 0.2);
+      color: #94a3b8;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+    }
+
+    .badge-status-deleted {
+      background: var(--danger-bg);
+      color: var(--danger-color);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+
+    .memory-body {
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: var(--text-primary);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .memory-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      border-top: 1px solid rgba(255, 255, 255, 0.04);
+      padding-top: 0.75rem;
+    }
+
+    .tag-pill {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    /* Modal / Drawer */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .modal-backdrop.active {
+      display: flex;
+    }
+
+    .modal-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-xl);
+      max-width: 680px;
+      width: 100%;
+      box-shadow: var(--shadow-lg);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: modalEnter 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes modalEnter {
+      from { transform: scale(0.95); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .modal-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+
+    .modal-body {
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.1rem;
+      max-height: 75vh;
+      overflow-y: auto;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .form-group label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .form-control {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 0.65rem 0.85rem;
+      color: var(--text-primary);
+      font-size: 0.9rem;
+      font-family: var(--font-sans);
+      outline: none;
+    }
+
+    .form-control:focus {
+      border-color: var(--border-focus);
+    }
+
+    textarea.form-control {
+      min-height: 120px;
+      resize: vertical;
+      line-height: 1.5;
+    }
+
+    .modal-footer {
+      padding: 1rem 1.5rem;
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+      background: var(--bg-surface);
+    }
+
+    /* Comparison & Duplicate Cards */
+    .dup-pair-card {
+      background: var(--bg-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .dup-cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .dup-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1rem;
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+
+    /* Toast Notification */
+    #toast-container {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      z-index: 200;
+    }
+
+    .toast {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-strong);
+      color: var(--text-primary);
+      padding: 0.75rem 1.25rem;
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-lg);
+      font-size: 0.875rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      animation: toastIn 0.25s ease-out;
+    }
+
+    @keyframes toastIn {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      display: inline-block;
+      box-shadow: 0 0 8px #10b981;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Bar -->
+  <header>
+    <a href="#" class="logo-cluster">
+      <div class="logo-icon">🧠</div>
+      <div>
+        <div class="logo-title">Lance Memory <span class="logo-badge">lance-mem0ry</span></div>
+      </div>
+    </a>
+
+    <div class="header-center">
+      <div class="project-picker">
+        <label for="active-project-select">Partition</label>
+        <select id="active-project-select" onchange="onProjectChange(this.value)">
+          <option value="FlamBot">FlamBot</option>
+          <option value="SolarFlare">SolarFlare</option>
+          <option value="EventHorizon">EventHorizon</option>
+          <option value="FareverAPI">FareverAPI</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <span style="font-size:0.8rem; color:var(--text-muted); display:flex; align-items:center; gap:0.4rem;">
+        <span class="status-dot"></span> Port 8768 FastMCP
+      </span>
+      <button class="btn btn-primary" onclick="openCreateModal()">+ Add Memory</button>
+    </div>
+  </header>
+
+  <div class="app-layout">
+    <!-- Left Navigation & Stats -->
+    <aside>
+      <div class="nav-tabs">
+        <button class="nav-tab-btn active" onclick="switchView('explorer')">
+          <span>🔍</span> Memory Explorer
+        </button>
+        <button class="nav-tab-btn" onclick="switchView('maintenance')">
+          <span>🧹</span> Maintenance & Dedup
+        </button>
+        <button class="nav-tab-btn" onclick="switchView('health')">
+          <span>📊</span> System & Embeddings
+        </button>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-card-title">Partition Stats</div>
+        <div class="metric-row">
+          <span class="metric-label">Active Facts</span>
+          <span class="metric-value" id="stat-active">-</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Blueprints / WIP</span>
+          <span class="metric-value" id="stat-blueprints">-</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Archived / Superseded</span>
+          <span class="metric-value" id="stat-archived">-</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Total Rows</span>
+          <span class="metric-value" id="stat-total">-</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Disk Storage</span>
+          <span class="metric-value" id="stat-disk">-</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Views -->
+    <main>
+      <!-- View 1: Explorer & Search -->
+      <section id="view-explorer" class="view-section active">
+        <div class="search-panel">
+          <div class="search-input-row">
+            <div class="search-box">
+              <span class="search-icon">🔎</span>
+              <input type="text" id="search-query" placeholder="Search facts, decisions, symbols, or queries... (Press Enter)" onkeydown="if(event.key==='Enter') executeSearch()">
+            </div>
+            <select id="search-type" class="search-mode-select" onchange="executeSearch()">
+              <option value="semantic">Hybrid Semantic</option>
+              <option value="symbol">Symbol Match</option>
+              <option value="recent">Recent Active</option>
+              <option value="id">Memory ID</option>
+            </select>
+            <button class="btn btn-secondary" onclick="executeSearch()">Search</button>
+          </div>
+
+          <div class="filter-chips-row">
+            <label style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">FILTERS:</label>
+            <select id="filter-bucket" class="filter-select" onchange="executeSearch()">
+              <option value="">All Buckets</option>
+              <option value="fact">Fact</option>
+              <option value="decision">Decision</option>
+              <option value="procedure">Procedure</option>
+              <option value="state">State (WIP/Handoff)</option>
+              <option value="constraint">Constraint</option>
+              <option value="preference">Preference</option>
+            </select>
+
+            <select id="filter-category" class="filter-select" onchange="executeSearch()">
+              <option value="">All Categories</option>
+              <option value="key_facts">key_facts</option>
+              <option value="architectural_decisions">architectural_decisions</option>
+              <option value="ongoing_tasks">ongoing_tasks</option>
+              <option value="session_handoff">session_handoff</option>
+              <option value="general">general</option>
+            </select>
+
+            <select id="filter-status" class="filter-select" onchange="executeSearch()">
+              <option value="active">Active Only</option>
+              <option value="superseded">Superseded</option>
+              <option value="deleted">Deleted</option>
+              <option value="all">All States</option>
+            </select>
+
+            <select id="filter-verified" class="filter-select" onchange="executeSearch()">
+              <option value="">Verified & Blueprints</option>
+              <option value="true">Verified Only</option>
+              <option value="false">Blueprints Only</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="memories-list" class="memories-container">
+          <div style="text-align:center; padding: 3rem; color:var(--text-muted);">
+            Loading memories from partition...
+          </div>
+        </div>
+      </section>
+
+      <!-- View 2: Maintenance & Deduplication -->
+      <section id="view-maintenance" class="view-section">
+        <div class="metric-card">
+          <h2 style="font-size:1.15rem; margin-bottom:0.4rem;">Semantic Duplicate & Conflict Scanner</h2>
+          <p style="font-size:0.875rem; color:var(--text-secondary); margin-bottom:1rem;">
+            Scans all active rows in the current partition and compares pairwise 768-dimensional Ollama vectors to surface duplicate facts or conflicting decisions.
+          </p>
+          <div style="display:flex; align-items:center; gap:1rem;">
+            <label style="font-size:0.85rem; color:var(--text-secondary);">Distance Threshold: <strong id="thresh-val">0.03</strong></label>
+            <input type="range" id="thresh-slider" min="0.01" max="0.10" step="0.005" value="0.03" oninput="document.getElementById('thresh-val').textContent=this.value" style="width:200px;">
+            <button class="btn btn-primary" onclick="runMaintenanceScan()">Run Duplicate Sweep</button>
+          </div>
+        </div>
+
+        <div id="maintenance-results" class="memories-container">
+          <div style="text-align:center; padding: 3rem; color:var(--text-muted);">
+            Click "Run Duplicate Sweep" to scan the partition.
+          </div>
+        </div>
+
+        <div class="metric-card" style="border-color: rgba(244, 63, 94, 0.3); background: rgba(244, 63, 94, 0.04);">
+          <h3 style="color:var(--danger-color); font-size:1rem; margin-bottom:0.3rem;">Partition Wipe Zone</h3>
+          <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.75rem;">
+            Purges all active and archived records from the active project partition. This action cannot be reversed.
+          </p>
+          <button class="btn btn-danger btn-sm" onclick="confirmPurgePartition()">Purge Partition</button>
+        </div>
+      </section>
+
+      <!-- View 3: System & Embeddings -->
+      <section id="view-health" class="view-section">
+        <div class="metric-card">
+          <h2 style="font-size:1.15rem; margin-bottom:0.75rem;">Backend Diagnostics & Infrastructure</h2>
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:1rem; margin-bottom:1.5rem;">
+            <div class="dup-box">
+              <div class="metric-card-title">Vector Embeddings</div>
+              <div style="font-size:1.1rem; font-weight:700; color:#10b981; margin-bottom:0.3rem;">Ollama nomic-embed-text</div>
+              <div style="font-size:0.8rem; color:var(--text-muted);" id="health-ollama-host">-</div>
+              <div style="font-size:0.8rem; color:var(--text-muted);">Dimension: 768 float</div>
+            </div>
+
+            <div class="dup-box">
+              <div class="metric-card-title">FastMCP Server</div>
+              <div style="font-size:1.1rem; font-weight:700; color:var(--accent-primary); margin-bottom:0.3rem;">Active (HTTP)</div>
+              <div style="font-size:0.8rem; color:var(--text-muted);">Port: 8768 Streamable</div>
+              <div style="font-size:0.8rem; color:var(--text-muted);">Endpoint: /mcp</div>
+            </div>
+
+            <div class="dup-box">
+              <div class="metric-card-title">Database Storage</div>
+              <div style="font-size:1.1rem; font-weight:700; color:var(--procedure-color); margin-bottom:0.3rem;">LanceDB v2</div>
+              <div style="font-size:0.8rem; color:var(--text-muted);" id="health-root-path">-</div>
+              <div style="font-size:0.8rem; color:var(--text-muted);">Table: records</div>
+            </div>
+          </div>
+
+          <h3 style="font-size:0.95rem; margin-bottom:0.5rem;">Raw Health Payload</h3>
+          <pre id="raw-health-json" style="background:var(--bg-surface); padding:1rem; border-radius:var(--radius-md); font-family:var(--font-mono); font-size:0.8rem; overflow-x:auto;"></pre>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Create Memory Modal -->
+  <div id="create-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">Commit New Memory</div>
+        <button class="btn btn-secondary btn-sm" onclick="closeCreateModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Memory Type / Purpose</label>
+          <select id="modal-type" class="form-control" onchange="onModalTypeChange(this.value)">
+            <option value="fact">Ratified Key Fact (verified=True)</option>
+            <option value="decision">Architectural Decision (verified=True)</option>
+            <option value="procedure">Execution Procedure (verified=True)</option>
+            <option value="blueprint">WIP Blueprint / Draft (verified=False)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Memory Text / Technical Fact</label>
+          <textarea id="modal-text" class="form-control" placeholder="Describe the technical fact, decision, or execution procedure..."></textarea>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label>Category</label>
+            <input type="text" id="modal-category" class="form-control" value="key_facts">
+          </div>
+          <div class="form-group">
+            <label>Bucket</label>
+            <select id="modal-bucket" class="form-control">
+              <option value="fact">fact</option>
+              <option value="decision">decision</option>
+              <option value="procedure">procedure</option>
+              <option value="state">state</option>
+              <option value="constraint">constraint</option>
+              <option value="preference">preference</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label>Code Symbol (Optional)</label>
+            <input type="text" id="modal-symbol" class="form-control" placeholder="e.g. ImGui.dockSpaceOverViewport">
+          </div>
+          <div class="form-group">
+            <label>Tags (Comma separated)</label>
+            <input type="text" id="modal-tags" class="form-control" placeholder="e.g. mcp, network, fastmcp">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeCreateModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="submitCreateMemory()">Commit to Partition</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Memory Modal -->
+  <div id="edit-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">Edit Memory Record</div>
+        <button class="btn btn-secondary btn-sm" onclick="closeEditModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="edit-id">
+        <div class="form-group">
+          <label>Memory Text (Editing triggers vector re-embedding)</label>
+          <textarea id="edit-text" class="form-control"></textarea>
+        </div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label>Category</label>
+            <input type="text" id="edit-category" class="form-control">
+          </div>
+          <div class="form-group">
+            <label>Bucket</label>
+            <select id="edit-bucket" class="form-control">
+              <option value="fact">fact</option>
+              <option value="decision">decision</option>
+              <option value="procedure">procedure</option>
+              <option value="state">state</option>
+              <option value="constraint">constraint</option>
+              <option value="preference">preference</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label>Code Symbol</label>
+            <input type="text" id="edit-symbol" class="form-control">
+          </div>
+          <div class="form-group">
+            <label>Tags (Comma separated)</label>
+            <input type="text" id="edit-tags" class="form-control">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="submitEditMemory()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script>
+    let currentProject = 'FlamBot';
+    let currentMemories = [];
+
+    // Toast helper
+    function showToast(msg, icon = '✓') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.innerHTML = `<span>${icon}</span> <span>${msg}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 3500);
+    }
+
+    // View switcher
+    function switchView(viewName) {
+      document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-tab-btn').forEach(el => el.classList.remove('active'));
+      
+      const target = document.getElementById(`view-${viewName}`);
+      if (target) target.classList.add('active');
+      
+      const btn = Array.from(document.querySelectorAll('.nav-tab-btn')).find(b => b.textContent.toLowerCase().includes(viewName));
+      if (btn) btn.classList.add('active');
+
+      if (viewName === 'health') loadHealth();
+    }
+
+    // Projects loader
+    async function loadProjects() {
+      try {
+        const res = await fetch('/api/projects');
+        if (res.ok) {
+          const data = await res.json();
+          const select = document.getElementById('active-project-select');
+          select.innerHTML = '';
+          data.projects.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.name;
+            opt.textContent = `${p.name} (${p.active_rows} active)`;
+            if (p.name === currentProject) opt.selected = true;
+            select.appendChild(opt);
+          });
+          if (data.projects.length > 0 && !data.projects.some(p => p.name === currentProject)) {
+            currentProject = data.projects[0].name;
+            select.value = currentProject;
+          }
+        }
+      } catch (e) {
+        console.warn('Projects fetch failed:', e);
+      }
+      loadMemories();
+    }
+
+    function onProjectChange(val) {
+      currentProject = val;
+      executeSearch();
+    }
+
+    // Memories loader / search
+    async function executeSearch() {
+      const q = document.getElementById('search-query').value.trim();
+      const st = document.getElementById('search-type').value;
+      const bucket = document.getElementById('filter-bucket').value;
+      const category = document.getElementById('filter-category').value;
+      const status = document.getElementById('filter-status').value;
+      const verified = document.getElementById('filter-verified').value;
+
+      const params = new URLSearchParams({
+        project: currentProject,
+        query: q,
+        search_type: st,
+        limit: '50'
+      });
+      if (bucket) params.append('bucket', bucket);
+      if (category) params.append('category', category);
+      if (status) params.append('status', status);
+      if (verified) params.append('verified', verified);
+
+      const list = document.getElementById('memories-list');
+      list.innerHTML = '<div style="text-align:center; padding: 2.5rem; color:var(--text-muted);">Searching memories...</div>';
+
+      try {
+        const res = await fetch(`/api/memories?${params.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+          currentMemories = data.rows || [];
+          renderMemories(currentMemories);
+          updateSidebarMetrics(data.stats || {});
+        } else {
+          list.innerHTML = `<div style="text-align:center; padding: 2rem; color:var(--danger-color);">Error fetching memories</div>`;
+        }
+      } catch (e) {
+        list.innerHTML = `<div style="text-align:center; padding: 2rem; color:var(--danger-color);">Connection error to FastMCP backend</div>`;
+      }
+    }
+
+    function updateSidebarMetrics(stats) {
+      document.getElementById('stat-active').textContent = stats.active_rows || 0;
+      document.getElementById('stat-blueprints').textContent = stats.blueprints || 0;
+      document.getElementById('stat-archived').textContent = stats.archived || 0;
+      document.getElementById('stat-total').textContent = stats.total_rows || 0;
+      document.getElementById('stat-disk').textContent = formatBytes(stats.disk_bytes || 0);
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    function renderMemories(rows) {
+      const container = document.getElementById('memories-list');
+      container.innerHTML = '';
+
+      if (!rows || rows.length === 0) {
+        container.innerHTML = `
+          <div style="text-align:center; padding: 3rem; background:var(--bg-glass); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); color:var(--text-muted);">
+            No memory records found matching criteria in <strong>${currentProject}</strong>.
+          </div>
+        `;
+        return;
+      }
+
+      rows.forEach(r => {
+        const card = document.createElement('div');
+        card.className = 'memory-card';
+
+        const bClass = `badge-${r.bucket || 'fact'}`;
+        const vBadge = r.verified 
+          ? `<span class="badge badge-verified">🛡️ Ratified</span>` 
+          : `<span class="badge badge-blueprint">📝 Blueprint (WIP)</span>`;
+        
+        let statusBadge = '';
+        if (r.status === 'superseded') statusBadge = `<span class="badge badge-status-superseded">Archived</span>`;
+        if (r.status === 'deleted') statusBadge = `<span class="badge badge-status-deleted">Deleted</span>`;
+
+        const tags = (r.tags || []).map(t => `<span class="tag-pill">#${t}</span>`).join(' ');
+        const symbolHtml = r.symbol ? `<span class="tag-pill" style="color:var(--accent-primary)">⚡ ${escapeHtml(r.symbol)}</span>` : '';
+
+        card.innerHTML = `
+          <div class="memory-card-header">
+            <div class="badge-group">
+              <span class="badge ${bClass}">${r.bucket || 'fact'}</span>
+              <span class="badge" style="background:rgba(255,255,255,0.06); color:var(--text-secondary);">${escapeHtml(r.category || 'general')}</span>
+              ${vBadge}
+              ${statusBadge}
+              ${symbolHtml}
+            </div>
+            <div class="card-actions">
+              ${!r.verified ? `<button class="btn btn-secondary btn-sm" style="color:#34d399;" onclick="promoteMemory('${r.memory_id}')">⬆ Promote</button>` : ''}
+              <button class="btn btn-secondary btn-sm" onclick="openEditModal('${r.memory_id}')">✎ Edit</button>
+              ${r.status === 'active' ? `<button class="btn btn-secondary btn-sm" onclick="archiveMemory('${r.memory_id}')">Archive</button>` : ''}
+              <button class="btn btn-danger btn-sm" onclick="deleteMemory('${r.memory_id}')">Delete</button>
+            </div>
+          </div>
+
+          <div class="memory-body">${escapeHtml(r.text || '')}</div>
+
+          <div class="memory-footer">
+            <div style="display:flex; gap:0.4rem; align-items:center;">
+              ${tags}
+            </div>
+            <div style="font-family:var(--font-mono); font-size:0.75rem;">
+              id: <span style="color:var(--text-secondary); cursor:pointer;" onclick="navigator.clipboard.writeText('${r.memory_id}'); showToast('Copied ID!')" title="Click to copy">${(r.memory_id || '').substring(0, 8)}...</span> · ${r.created_at ? r.created_at.substring(0, 10) : ''}
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // Modal Create
+    function openCreateModal() {
+      document.getElementById('create-modal').classList.add('active');
+    }
+    function closeCreateModal() {
+      document.getElementById('create-modal').classList.remove('active');
+    }
+    function onModalTypeChange(val) {
+      const cat = document.getElementById('modal-category');
+      const bkt = document.getElementById('modal-bucket');
+      if (val === 'fact') { cat.value = 'key_facts'; bkt.value = 'fact'; }
+      if (val === 'decision') { cat.value = 'architectural_decisions'; bkt.value = 'decision'; }
+      if (val === 'procedure') { cat.value = 'procedural_memory'; bkt.value = 'procedure'; }
+      if (val === 'blueprint') { cat.value = 'ongoing_tasks'; bkt.value = 'state'; }
+    }
+
+    async function submitCreateMemory() {
+      const text = document.getElementById('modal-text').value.trim();
+      if (!text) { alert('Please enter memory text'); return; }
+
+      const type = document.getElementById('modal-type').value;
+      const verified = type !== 'blueprint';
+      const category = document.getElementById('modal-category').value.trim();
+      const bucket = document.getElementById('modal-bucket').value;
+      const symbol = document.getElementById('modal-symbol').value.trim();
+      const tags = document.getElementById('modal-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+
+      try {
+        const res = await fetch('/api/memories', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            project: currentProject,
+            text,
+            type: 'discovery',
+            metadata: { category, bucket, verified, symbol, tags }
+          })
+        });
+        if (res.ok) {
+          showToast('Memory committed successfully!');
+          closeCreateModal();
+          document.getElementById('modal-text').value = '';
+          executeSearch();
+        } else {
+          const err = await res.json();
+          alert('Error committing memory: ' + (err.error || 'Server error'));
+        }
+      } catch (e) {
+        alert('Failed to connect to backend');
+      }
+    }
+
+    // Modal Edit
+    function openEditModal(mid) {
+      const row = currentMemories.find(r => r.memory_id === mid);
+      if (!row) return;
+      document.getElementById('edit-id').value = row.memory_id;
+      document.getElementById('edit-text').value = row.text || '';
+      document.getElementById('edit-category').value = row.category || '';
+      document.getElementById('edit-bucket').value = row.bucket || 'fact';
+      document.getElementById('edit-symbol').value = row.symbol || '';
+      document.getElementById('edit-tags').value = (row.tags || []).join(', ');
+      document.getElementById('edit-modal').classList.add('active');
+    }
+    function closeEditModal() {
+      document.getElementById('edit-modal').classList.remove('active');
+    }
+
+    async function submitEditMemory() {
+      const mid = document.getElementById('edit-id').value;
+      const text = document.getElementById('edit-text').value.trim();
+      const category = document.getElementById('edit-category').value.trim();
+      const bucket = document.getElementById('edit-bucket').value;
+      const symbol = document.getElementById('edit-symbol').value.trim();
+      const tags = document.getElementById('edit-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+
+      try {
+        const res = await fetch(`/api/memories/${mid}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            project: currentProject,
+            patch: { text, category, bucket, symbol, tags }
+          })
+        });
+        if (res.ok) {
+          showToast('Record updated & re-embedded!');
+          closeEditModal();
+          executeSearch();
+        } else {
+          const err = await res.json();
+          alert('Error updating memory: ' + (err.error || 'Server error'));
+        }
+      } catch (e) {
+        alert('Failed to connect to backend');
+      }
+    }
+
+    // Promote
+    async function promoteMemory(mid) {
+      const row = currentMemories.find(r => r.memory_id === mid);
+      if (!row) return;
+      const cat = prompt('Ratified Category:', 'key_facts') || 'key_facts';
+      try {
+        const res = await fetch('/api/memories', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            project: currentProject,
+            text: row.text,
+            type: 'promotion',
+            metadata: {
+              supersedes_id: mid,
+              category: cat,
+              symbol: row.symbol || ''
+            }
+          })
+        });
+        if (res.ok) {
+          showToast('Blueprint promoted to ratified fact!');
+          executeSearch();
+        } else {
+          const err = await res.json();
+          alert('Promotion error: ' + (err.error || 'Unknown'));
+        }
+      } catch (e) {
+        alert('Connection failure');
+      }
+    }
+
+    // Archive / Delete
+    async function archiveMemory(mid) {
+      if (!confirm('Mark memory as superseded / archived?')) return;
+      await updateStatus(mid, 'superseded');
+    }
+    async function deleteMemory(mid) {
+      if (!confirm('Delete memory record?')) return;
+      await updateStatus(mid, 'deleted');
+    }
+
+    async function updateStatus(mid, st) {
+      try {
+        const res = await fetch(`/api/memories/${mid}/status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ project: currentProject, status: st })
+        });
+        if (res.ok) {
+          showToast(`Status set to ${st}`);
+          executeSearch();
+        } else {
+          alert('Status update failed');
+        }
+      } catch (e) {
+        alert('Connection error');
+      }
+    }
+
+    // Maintenance Sweep
+    async function runMaintenanceScan() {
+      const th = parseFloat(document.getElementById('thresh-slider').value);
+      const container = document.getElementById('maintenance-results');
+      container.innerHTML = '<div style="text-align:center; padding:2rem; color:var(--text-muted);">Running vector duplicate sweep...</div>';
+
+      try {
+        const res = await fetch('/api/maintenance/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ project: currentProject, threshold: th })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          renderDuplicates(data.duplicates || [], data.active_rows_scanned || 0);
+        } else {
+          container.innerHTML = '<div style="color:var(--danger-color); padding:1rem;">Scan request failed</div>';
+        }
+      } catch (e) {
+        container.innerHTML = '<div style="color:var(--danger-color); padding:1rem;">Connection error</div>';
+      }
+    }
+
+    function renderDuplicates(dups, count) {
+      const container = document.getElementById('maintenance-results');
+      container.innerHTML = '';
+      if (dups.length === 0) {
+        container.innerHTML = `
+          <div style="text-align:center; padding:2.5rem; background:var(--bg-glass); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); color:#10b981;">
+            ✓ No duplicates detected across ${count} active records!
+          </div>
+        `;
+        return;
+      }
+
+      dups.forEach(d => {
+        const simPercent = ((1 - d.cosine_distance) * 100).toFixed(1);
+        const card = document.createElement('div');
+        card.className = 'dup-pair-card';
+        card.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-weight:700; color:var(--state-color);">Candidate Conflict · ${simPercent}% Vector Similarity</span>
+            <span style="font-size:0.8rem; color:var(--text-muted); font-family:var(--font-mono);">Cosine Dist: ${d.cosine_distance.toFixed(4)}</span>
+          </div>
+          <div class="dup-cols">
+            <div class="dup-box">
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.3rem;">ID: ${d.id_a}</div>
+              <div>${escapeHtml(d.text_a)}</div>
+              <button class="btn btn-secondary btn-sm" style="margin-top:0.6rem;" onclick="keepAndSupersede('${d.id_a}', '${d.id_b}')">Keep This & Supersede Other</button>
+            </div>
+            <div class="dup-box">
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.3rem;">ID: ${d.id_b}</div>
+              <div>${escapeHtml(d.text_b)}</div>
+              <button class="btn btn-secondary btn-sm" style="margin-top:0.6rem;" onclick="keepAndSupersede('${d.id_b}', '${d.id_a}')">Keep This & Supersede Other</button>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    async function keepAndSupersede(keepId, removeId) {
+      await updateStatus(removeId, 'superseded');
+      runMaintenanceScan();
+    }
+
+    async function confirmPurgePartition() {
+      const confirmStr = prompt(`Type "${currentProject}" to confirm wiping all records from this partition:`);
+      if (confirmStr !== currentProject) {
+        alert('Confirmation mismatch. Purge cancelled.');
+        return;
+      }
+      try {
+        const res = await fetch('/api/maintenance/purge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ project: currentProject, confirm: true })
+        });
+        if (res.ok) {
+          showToast(`Partition ${currentProject} purged.`);
+          executeSearch();
+        }
+      } catch (e) {
+        alert('Purge failed');
+      }
+    }
+
+    // Health loader
+    async function loadHealth() {
+      try {
+        const res = await fetch('/api/health');
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('health-ollama-host').textContent = data.ollama_host || '-';
+          document.getElementById('health-root-path').textContent = data.project_memories_root || '-';
+          document.getElementById('raw-health-json').textContent = JSON.stringify(data, null, 2);
+        }
+      } catch (e) {
+        document.getElementById('raw-health-json').textContent = 'Error loading health payload';
+      }
+    }
+
+    // Init
+    window.addEventListener('DOMContentLoaded', () => {
+      loadProjects();
+    });
+  </script>
+</body>
+</html>

@@ -178,3 +178,17 @@ sudo systemctl stop lance-memory-http.service
 tar -xzf backup_<timestamp>.tar.gz -C /opt/lance-memory
 sudo systemctl start lance-memory-http.service
 ```
+
+
+## Web Control Panel
+
+The FastMCP HTTP service embeds an interactive Web Control Panel directly on the main HTTP port:
+
+- **URL:** `http://<HOST>:8768/` or `http://<HOST>:8768/panel`
+- **Features:**
+  - Partition switcher (`FlamBot`, `SolarFlare`, `EventHorizon`, `FareverAPI`, etc.)
+  - Multi-mode search (`semantic`, `symbol`, `recent`, `id`) with bucket and category filtering
+  - Inline memory creator and editor with automatic vector re-embedding
+  - One-click promotion from unverified blueprints to ratified facts
+  - Live pairwise cosine duplicate & conflict scanner
+  - Backend diagnostics (Ollama status, database storage path, disk usage)
