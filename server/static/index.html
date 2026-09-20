@@ -716,10 +716,7 @@
       <div class="project-picker">
         <label for="active-project-select">Partition</label>
         <select id="active-project-select" onchange="onProjectChange(this.value)">
-          <option value="FlamBot">FlamBot</option>
-          <option value="SolarFlare">SolarFlare</option>
-          <option value="EventHorizon">EventHorizon</option>
-          <option value="FareverAPI">FareverAPI</option>
+          <option value="">Loading projects...</option>
         </select>
       </div>
     </div>
@@ -941,7 +938,7 @@
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem;">
           <div class="form-group">
             <label>Code Symbol (Optional)</label>
-            <input type="text" id="modal-symbol" class="form-control" placeholder="e.g. ImGui.dockSpaceOverViewport">
+            <input type="text" id="modal-symbol" class="form-control" placeholder="e.g. AuthRouter.handle">
           </div>
           <div class="form-group">
             <label>Tags (Comma separated)</label>
@@ -1007,7 +1004,7 @@
   <div id="toast-container"></div>
 
   <script>
-    let currentProject = 'FlamBot';
+    let currentProject = '';
     let currentMemories = [];
 
     // Toast helper
@@ -1042,16 +1039,24 @@
           const data = await res.json();
           const select = document.getElementById('active-project-select');
           select.innerHTML = '';
-          data.projects.forEach(p => {
+          if (!data.projects || data.projects.length === 0) {
             const opt = document.createElement('option');
-            opt.value = p.name;
-            opt.textContent = `${p.name} (${p.active_rows} active)`;
-            if (p.name === currentProject) opt.selected = true;
+            opt.value = '';
+            opt.textContent = 'No projects provisioned';
             select.appendChild(opt);
-          });
-          if (data.projects.length > 0 && !data.projects.some(p => p.name === currentProject)) {
-            currentProject = data.projects[0].name;
-            select.value = currentProject;
+            currentProject = '';
+          } else {
+            data.projects.forEach(p => {
+              const opt = document.createElement('option');
+              opt.value = p.name;
+              opt.textContent = `${p.name} (${p.active_rows} active)`;
+              if (p.name === currentProject) opt.selected = true;
+              select.appendChild(opt);
+            });
+            if (!currentProject || !data.projects.some(p => p.name === currentProject)) {
+              currentProject = data.projects[0].name;
+              select.value = currentProject;
+            }
           }
         }
       } catch (e) {

@@ -12,6 +12,7 @@ API response and accepted on write; it is not a second copy on disk.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import sys
@@ -39,13 +40,16 @@ EMBED_DIM = 768
 TABLE_NAME = "records"
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
-# Tip default; Windows local DBs deprecated — always use PROJECT_MEMORIES_ROOT subdirs.
+_candidate_memories_root = (
+    _SCRIPT_DIR.parent / "project_memories"
+    if (_SCRIPT_DIR.parent / "project_memories").is_dir()
+    else _SCRIPT_DIR / "project_memories"
+)
 DEFAULT_MEMORIES_ROOT = Path(
     os.environ.get("PROJECT_MEMORIES_ROOT", "").strip()
-    or str(_SCRIPT_DIR / "project_memories")
+    or str(_candidate_memories_root)
 )
 
-DEFAULT_PROJECT = os.environ.get("PROJECT_MEMORY", "").strip()
 KNOWN_PROJECTS = tuple(
     name.strip()
     for name in os.environ.get("PROJECT_MEMORY_PROJECTS", "").split(",")
@@ -59,10 +63,6 @@ MEMORY_CATEGORIES = (
     "ongoing_tasks",
     "session_handoff",
     "architectural_decisions",
-    "hkx_hooks_and_targets",
-    "verified_imgui_ui_elements",
-    "imgui_structure",
-    "solar_flare_design_decisions",
     "general",
 )
 
@@ -94,7 +94,6 @@ DEFAULT_SOURCE_TYPE = "agent"
 CATEGORY_BUCKET_MAP = {
     "key_facts": "fact",
     "architectural_decisions": "decision",
-    "solar_flare_design_decisions": "decision",
     "ongoing_tasks": "state",
     "session_handoff": "state",
 }
@@ -135,18 +134,31 @@ def project_paths() -> dict[str, Path]:
     return {name: root / name for name in sorted(configured | discovered)}
 
 
-def active_project() -> str:
-    name = os.environ.get("PROJECT_MEMORY", DEFAULT_PROJECT).strip()
-    if not name:
-        raise ValueError("project is required (or set PROJECT_MEMORY)")
-    return _validate_project_name(name)
-
-
 def resolve_project(project: Optional[str] = None) -> str:
-    """Prefer explicit tool `project` arg; fall back to PROJECT_MEMORY env."""
-    if project is not None and str(project).strip():
-        return _validate_project_name(str(project).strip())
-    return active_project()
+    """Resolve an explicitly selected, administrator-authorized partition.
+
+    There is deliberately no active/default project. Agents must first inspect
+    the authorized project list, choose the best contextual project, and pass
+    its canonical ID on every project-scoped call.
+    """
+    name = str(project or "").strip()
+    if not name:
+        raise ValueError(
+            "project_id is required; call inspect_memory_system(action='projects') "
+            "and select the best contextual fit for the current workspace/task "
+            "(the folder name does not need to match)"
+        )
+    name = _validate_project_name(name)
+    authorized = project_paths()
+    canonical = next((item for item in authorized if item.casefold() == name.casefold()), None)
+    if canonical is None:
+        valid = ", ".join(authorized) or "<none provisioned>"
+        raise ValueError(
+            f"unknown or unauthorized project_id={name!r}; authorized project IDs: {valid}. "
+            "Choose the best contextual fit; folder-name equality is not required. "
+            "Do not invent project IDs."
+        )
+    return canonical
 
 
 def project_db_path(project: Optional[str] = None) -> Path:
@@ -159,6 +171,72 @@ def _validate_project_name(name: str) -> str:
             "project must be 1-128 characters using letters, numbers, '.', '_', or '-'"
         )
     return name
+
+
+
+def get_project_categories_path(project: str) -> Path:
+    return memories_root() / resolve_project(project) / "categories.json"
+
+def load_project_categories(project: str) -> dict[str, dict[str, Any]]:
+    cat_file = get_project_categories_path(project)
+    if cat_file.is_file():
+        try:
+            with open(cat_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    defaults = {
+        "key_facts": {"description": "Ratified facts, verified patterns, stable APIs, and configuration constants.", "bucket": "fact"},
+        "architectural_decisions": {"description": "System architecture, design choices, invariants, patterns, and architectural trade-offs.", "bucket": "decision"},
+        "ongoing_tasks": {"description": "WIP blueprints, hypotheses, and pending implementation steps.", "bucket": "state"},
+        "session_handoff": {"description": "Session summaries, milestones reached, and next action items.", "bucket": "state"},
+    }
+    save_project_categories(project, defaults)
+    return defaults
+
+
+def project_routing_profile(project: str) -> dict[str, Any]:
+    """Return generic semantic routing hints for an authorized partition.
+
+    Optional project.json metadata lets administrators add descriptions,
+    aliases, and workspace hints without coupling selection to exact paths.
+    Category names/descriptions and ID tokens always provide fallback signals.
+    """
+    proj = resolve_project(project)
+    metadata: dict[str, Any] = {}
+    profile_path = memories_root() / proj / "project.json"
+    if profile_path.is_file():
+        try:
+            loaded = json.loads(profile_path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                metadata = loaded
+        except Exception:
+            metadata = {}
+    id_tokens = [
+        token.lower()
+        for token in re.findall(r"[A-Z]+(?=[A-Z][a-z]|$)|[A-Z]?[a-z]+|[0-9]+", proj)
+    ]
+    categories = load_project_categories(proj)
+    category_signals = [
+        {"name": name, "description": str(spec.get("description") or "")}
+        for name, spec in categories.items()
+    ]
+    return {
+        "project_id": proj,
+        "description": str(metadata.get("description") or ""),
+        "aliases": [str(v) for v in metadata.get("aliases", []) if str(v).strip()],
+        "workspace_hints": [
+            str(v) for v in metadata.get("workspace_hints", []) if str(v).strip()
+        ],
+        "id_tokens": id_tokens,
+        "category_signals": category_signals,
+    }
+
+def save_project_categories(project: str, categories: dict[str, dict[str, Any]]) -> None:
+    cat_file = get_project_categories_path(project)
+    cat_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(cat_file, "w", encoding="utf-8") as f:
+        json.dump(categories, f, indent=2)
 
 
 def _iso_now() -> str:
@@ -301,11 +379,14 @@ def _row_public(row: dict) -> dict:
     `content` mirrors `text` — v2 name for the same stored column.
     """
     text = row.get("text", "")
-    tags = row.get("tags") or []
-    try:
-        tags = [str(t) for t in tags]
-    except Exception:
+    raw_tags = row.get("tags")
+    if raw_tags is None:
         tags = []
+    else:
+        try:
+            tags = [str(t) for t in raw_tags]
+        except (TypeError, ValueError):
+            tags = []
     return {
         # v1
         "text": text,
@@ -776,7 +857,13 @@ def list_recent_impl(limit: int = 10, project: Optional[str] = None) -> list[dic
         return [{"error": str(e)}]
 
 
-_PROJECT_DOC = "Any project name you choose (defaults to PROJECT_MEMORY env)"
+_PROJECT_DOC = (
+    "Required authorized project ID. Discover choices with "
+    "inspect_memory_system(action='projects'). Prefer lance_memory_project_id "
+    "declared by the nearest applicable AGENTS.md; otherwise select the best "
+    "contextual fit using project purpose, task, aliases, workspace hints, and categories. "
+    "The folder name does not need to match. There is no active/default project."
+)
 
 
 def _health_payload() -> dict:
@@ -795,6 +882,8 @@ def _health_payload() -> dict:
         "ok": True,
         "status": "healthy",
         "projects": projects_data,
+        "authorized_project_ids": [item["project"] for item in projects_data],
+        "project_selection_mode": "explicit_per_call",
         "total_rows": total,
         "embedder": f"ollama/{EMBED_MODEL} ({EMBED_DIM}-dim)",
         "harness": "active",
@@ -850,8 +939,7 @@ def build_mcp():
         configured = set(KNOWN_PROJECTS)
         discovered = {p.name for p in root.iterdir() if p.is_dir() and not p.name.startswith(".")} if root.is_dir() else set()
         all_projects = sorted(configured | discovered)
-        if not all_projects:
-            all_projects = ["FlamBot", "SolarFlare", "EventHorizon", "FareverAPI"]
+
         results = []
         for p in all_projects:
             try:
@@ -1070,14 +1158,19 @@ def build_mcp():
         filters: Optional[dict] = None,
         limit: int = 8,
     ) -> list[dict]:
-        """Query or browse project memories.
+        """Query or browse memories in an explicitly selected project.
+
+        project_id must be one of the IDs returned by
+        inspect_memory_system(action="projects"). Prefer an authorized
+        AGENTS.md declaration, otherwise select the best contextual fit; folder
+        names need not match and no active project is used.
 
         search_type: semantic | symbol | recent | id
         filters: bucket/buckets, tags, agent_id, run_id, verified, memory_id
         """
         filt = dict(filters or {})
         st = (search_type or "semantic").strip().lower()
-        proj = project_id or ""
+        proj = resolve_project(project_id)
 
         if st == "symbol":
             if not (query or "").strip():
@@ -1133,17 +1226,32 @@ def build_mcp():
     ) -> dict:
         """Store discoveries, milestone handoffs, or promote WIP to verified facts.
 
+        project_id must be an authorized ID returned by
+        inspect_memory_system(action="projects"). It is never defaulted.
+
         type: discovery | handoff | promotion
         """
         meta = dict(metadata or {})
         ctype = (type or "discovery").strip().lower()
-        proj = project_id
+        proj = resolve_project(project_id)
 
         if ctype == "discovery":
+            category = str(meta.get("category") or "").strip()
+            if not category:
+                raise ValueError(
+                    "metadata.category is required; inspect the project registry with "
+                    "inspect_memory_system(action='categories', project_id=...)"
+                )
+            categories = load_project_categories(proj)
+            if category not in categories:
+                raise ValueError(
+                    f"unknown category={category!r} for project {proj!r}; "
+                    f"valid categories: {', '.join(categories)}"
+                )
             return record_discovery_impl(
                 text,
                 symbol=str(meta.get("symbol") or ""),
-                category=str(meta.get("category") or "general"),
+                category=category,
                 project=proj,
                 verified=bool(meta["verified"]) if "verified" in meta else True,
                 bucket=str(meta.get("bucket") or ""),
@@ -1173,10 +1281,17 @@ def build_mcp():
             sid = str(meta.get("supersedes_id") or "").strip()
             if not sid:
                 raise ValueError("metadata.supersedes_id is required for type=promotion")
+            category = str(meta.get("category") or "key_facts")
+            categories = load_project_categories(proj)
+            if category not in categories:
+                raise ValueError(
+                    f"unknown category={category!r} for project {proj!r}; "
+                    f"valid categories: {', '.join(categories)}"
+                )
             return promote_to_fact_impl(
                 sid,
                 project=proj,
-                category=str(meta.get("category") or "key_facts"),
+                category=category,
                 text=(text or "").strip(),
                 symbol=str(meta.get("symbol") or ""),
                 evidence=str(meta.get("evidence") or ""),
@@ -1193,11 +1308,14 @@ def build_mcp():
     ) -> dict:
         """Mutate or lifecycle-update long-term memories.
 
+        project_id must be an authorized ID returned by
+        inspect_memory_system(action="projects"). It is never defaulted.
+
         action: update | delete | archive | purge
         """
         patch = dict(patch_data or {})
         act = (action or "").strip().lower()
-        proj = project_id
+        proj = resolve_project(project_id)
         mid = (memory_id or "").strip()
 
         if act == "purge":
@@ -1241,7 +1359,11 @@ def build_mcp():
         action: str,
         turn_data: Optional[dict] = None,
     ) -> dict:
-        """Working-memory session buffer: begin | read | write | flush."""
+        """Working-memory session buffer: begin | read | write | flush.
+
+        project_id must be an authorized ID returned by
+        inspect_memory_system(action="projects"). It is never defaulted.
+        """
         data = dict(turn_data or {})
         act = (action or "").strip().lower()
         proj = resolve_project(project_id)
@@ -1323,14 +1445,53 @@ def build_mcp():
         project_id: str = "",
         target_id: str = "",
     ) -> dict:
-        """Admin checks: health | stats | maintenance_scan | history."""
+        """Inspect projects, categories, health, stats, maintenance, or history.
+
+        Start with action="projects" (no project_id needed). Match the current
+        workspace/task to the best-fit returned profile, then pass its canonical
+        ID to every project-scoped tool call and inspection action.
+        """
         act = (action or "health").strip().lower()
+
+        if act == "projects":
+            health = _health_payload()
+            profiles = []
+            for item in health["projects"]:
+                profile = project_routing_profile(item["project"])
+                profiles.append({**item, **profile})
+            return {
+                "status": "ok",
+                "project_selection_mode": "explicit_per_call",
+                "authorized_project_ids": health["authorized_project_ids"],
+                "projects": profiles,
+                "selection_instructions": (
+                    "First use lance_memory_project_id from the nearest applicable "
+                    "AGENTS.md when that ID is authorized. Otherwise select the best-fit "
+                    "authorized project contextually from the workspace/repository "
+                    "purpose, current task, agent identity, ID tokens, aliases, workspace "
+                    "hints, and category descriptions. Folder-name equality is not "
+                    "required and a close-but-not-identical folder name is not a reason "
+                    "to refuse memory. Pass the returned canonical project_id on every "
+                    "project-scoped call. Ask the user only when two profiles are "
+                    "genuinely ambiguous; never invent an ID."
+                ),
+            }
+
+        if act == "categories":
+            proj = resolve_project(project_id)
+            cats = load_project_categories(proj)
+            return {
+                "project": proj,
+                "categories": cats,
+                "valid_category_names": list(cats.keys()),
+                "status": "ok",
+            }
 
         if act == "health":
             return _health_payload()
 
         if act == "stats":
-            proj = resolve_project(project_id or None)
+            proj = resolve_project(project_id)
             try:
                 p_db = lancedb.connect(str(project_db_path(proj)))
                 tbl = p_db.open_table(TABLE_NAME)
@@ -1394,7 +1555,7 @@ def build_mcp():
             return {"memory_id": tid, "history": lm.history(tid, project=proj)}
 
         raise ValueError(
-            f"unknown action={action!r}; use health|stats|maintenance_scan|history"
+            f"unknown action={action!r}; use projects|health|stats|maintenance_scan|history|categories"
         )
 
     skills_root = _SCRIPT_DIR / "skills"
@@ -1464,19 +1625,19 @@ def main(argv: Optional[list[str]] = None) -> None:
     if not hasattr(mcp, "run"):
         raise RuntimeError("FastMCP instance has no run()")
     if transport == "stdio":
-        print(f"Starting lance-memory stdio (default project={active_project()})", file=sys.stderr)
+        print("Starting lance-memory stdio (explicit project selection required)", file=sys.stderr)
         mcp.run(transport="stdio")
     elif transport in ("http", "streamable-http"):
         print(
             f"Starting lance-memory streamable HTTP on http://{host}:{port}/mcp "
-            f"(default project={active_project()}, root={memories_root()})",
+            f"(explicit project selection required, root={memories_root()})",
             file=sys.stderr,
         )
         mcp.run(transport=transport, host=host, port=port)
     elif transport == "sse":
         print(
             f"Starting lance-memory SSE on http://{host}:{port}/sse "
-            f"(default project={active_project()}, root={memories_root()})",
+            f"(explicit project selection required, root={memories_root()})",
             file=sys.stderr,
         )
         mcp.run(transport=transport, host=host, port=port)

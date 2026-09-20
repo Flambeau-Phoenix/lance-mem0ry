@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
@@ -262,8 +263,89 @@ def delete_project_completely(project: str) -> bool:
     return True
 
 
+class NumpyEncoder(json.JSONEncoder):
+    """Custom JSON encoder to properly serialize numpy arrays and timestamps."""
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, (np.integer, np.floating)):
+            return obj.item()
+        if isinstance(obj, (datetime, pd.Timestamp)):
+            return obj.isoformat()
+        return super().default(obj)
+
+
+def load_project_categories(project: str) -> dict[str, dict[str, Any]]:
+    path = memories_root() / project / "categories.json"
+    if path.is_file():
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    defaults = {
+        "key_facts": {
+            "description": "Ratified facts, verified patterns, stable APIs, and configuration constants.",
+            "bucket": "fact"
+        },
+        "architectural_decisions": {
+            "description": "System architecture, design choices, invariants, patterns, and architectural trade-offs.",
+            "bucket": "decision"
+        },
+        "ongoing_tasks": {
+            "description": "WIP blueprints, hypotheses, and pending implementation steps.",
+            "bucket": "state"
+        },
+        "session_handoff": {
+            "description": "Session summaries, milestones reached, and next action items.",
+            "bucket": "state"
+        }
+    }
+    save_project_categories(project, defaults)
+    return defaults
+
+
+def save_project_categories(project: str, categories: dict[str, dict[str, Any]]) -> None:
+    path = memories_root() / project / "categories.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(categories, f, indent=2)
+
+
+def migrate_or_copy_category(source_proj: str, target_proj: str, category_name: str, mode: str = "copy") -> int:
+    """Copy or move all records in category_name from source_proj to target_proj."""
+    src_table = get_table(source_proj)
+    target_table = get_table(target_proj)
+
+    src_records = src_table.search().where(f"category = '{category_name}'").limit(50_000).to_arrow().to_pylist()
+    if not src_records:
+        return 0
+
+    for r in src_records:
+        r["project_id"] = target_proj
+        r["updated_at"] = _iso_now()
+
+    target_table.add(src_records)
+    rebuild_fts(target_table)
+    invalidate_table(target_proj)
+
+    # Copy category definition
+    src_cats = load_project_categories(source_proj)
+    target_cats = load_project_categories(target_proj)
+    if category_name in src_cats:
+        target_cats[category_name] = src_cats[category_name]
+        save_project_categories(target_proj, target_cats)
+
+    if mode.lower() == "move":
+        src_table.delete(f"category = '{category_name}'")
+        rebuild_fts(src_table)
+        invalidate_table(source_proj)
+
+    return len(src_records)
+
+
 def create_new_project(new_name: str) -> bool:
-    """Create a new project directory and table."""
+    """Create a new project directory, table, and default categories."""
     import lancedb
     clean_name = re.sub(r"[^a-zA-Z0-9_-]", "", new_name.strip())
     if not clean_name:
@@ -274,6 +356,7 @@ def create_new_project(new_name: str) -> bool:
     db = lancedb.connect(str(proj_dir))
     table = db.create_table(TABLE_NAME, schema=ArchitecturalMemory)
     rebuild_fts(table)
+    load_project_categories(clean_name)
     return True
 
 
@@ -328,8 +411,23 @@ def ingest_records(project: str, records: list[dict[str, Any]], progress_bar=Non
 available_projects = get_available_projects()
 
 st.sidebar.title("🧠 LanceDB Control")
-default_idx = 0
-project = st.sidebar.selectbox("Active Project Partition", available_projects, index=default_idx)
+if available_projects:
+    default_idx = 0
+    project = st.sidebar.selectbox("Admin View Partition", available_projects, index=default_idx)
+else:
+    project = None
+    st.sidebar.info("No projects provisioned yet.")
+
+with st.sidebar.expander("➕ Provision New Project", expanded=not bool(available_projects)):
+    sb_new_p = st.text_input("New Project Name", placeholder="e.g. MyProject", key="sb_new_p_input")
+    if st.button("Create Project", key="sb_create_p_btn", disabled=not sb_new_p.strip(), use_container_width=True):
+        try:
+            create_new_project(sb_new_p.strip())
+            st.success(f"Project '{sb_new_p.strip()}' created!")
+            time.sleep(0.5)
+            st.rerun()
+        except Exception as e:
+            st.error(f"Error: {e}")
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("⏱️ Auto-Refresh Controls")
@@ -346,6 +444,13 @@ if st.sidebar.button("🔄 Refresh Now", use_container_width=True):
 
 st.sidebar.markdown("---")
 st.sidebar.caption("Partitions are directory-based under PROJECT_MEMORIES_ROOT.\nSet PROJECT_MEMORY_PROJECTS to pre-seed project names.")
+
+def require_active_project() -> bool:
+    if not project:
+        st.info("💡 No project partition active. Use **➕ Provision New Project** in the sidebar to create your first project partition.")
+        return False
+    return True
+
 
 # Top Header Navigation Tabs
 tabs = st.tabs([
@@ -376,7 +481,7 @@ with tabs[0]:
     m1.metric("FastMCP HTTP", "ACTIVE" if http_ok else "OFFLINE", http_message)
     m2.metric("Extraction LLM", "ONLINE" if b_ok else "OFFLINE", b_message)
     m3.metric("Ollama Embeddings", "READY" if ol_ok else "OFFLINE", ol_message)
-    m4.metric("Active Partitions", len(available_projects), "Unified access")
+    m4.metric("Authorized Partitions", len(available_projects), "Explicit agent selection")
 
 
     st.markdown("### 🗄️ LanceDB Partition Ledger")
@@ -400,6 +505,8 @@ with tabs[0]:
 # TAB 2: View & Search Memories (Entry Tier)
 # ---------------------------------------------------------------------------
 with tabs[1]:
+    if not require_active_project():
+        st.stop()
     st.title(f"📂 View Memories & Entry Controls · {project}")
 
     # Search & Filtering Bar
@@ -469,6 +576,8 @@ with tabs[1]:
 # TAB 3: Rules & Directives (Mem0 Dissection Tier)
 # ---------------------------------------------------------------------------
 with tabs[2]:
+    if not require_active_project():
+        st.stop()
     st.title("📜 Rules, System Prompts & Directives (Mem0 Dissection)")
     st.markdown("Manage persistent agent rules, user preferences, and operational constraints extracted from Mem0.")
 
@@ -519,58 +628,149 @@ with tabs[2]:
             st.info("No active rules found in this partition. Add rules using the form on the left.")
 
 # ---------------------------------------------------------------------------
-# TAB 4: Category Controls
+# TAB 4: Category Management
 # ---------------------------------------------------------------------------
 with tabs[3]:
+    if not require_active_project():
+        st.stop()
     st.title(f"🏷️ Category Management · {project}")
-    st.markdown("Perform bulk operations on whole memory categories within the active partition.")
+    st.markdown("Define, describe, and migrate memory categories. Categories guide agents and maintainers on where facts belong.")
 
-    df_p = get_project_records(project, limit=5000)
+    cat_defs = load_project_categories(project)
+    df_p = get_project_records(project, limit=10_000)
+
+    counts_map = {}
     if not df_p.empty and "category" in df_p.columns:
-        cat_counts = df_p["category"].value_counts().reset_index()
-        cat_counts.columns = ["Category Name", "Record Count"]
+        counts_map = df_p["category"].value_counts().to_dict()
 
-        st.subheader("Category Breakdown")
-        st.dataframe(cat_counts, width="stretch", hide_index=True)
+    # Build catalog rows
+    catalog_rows = []
+    all_cat_names = sorted(set(list(cat_defs.keys()) + list(counts_map.keys())))
+    for cname in all_cat_names:
+        cinfo = cat_defs.get(cname, {})
+        catalog_rows.append({
+            "Category Name": cname,
+            "Bucket": cinfo.get("bucket", "fact"),
+            "Description": cinfo.get("description", "(No description set)"),
+            "Record Count": counts_map.get(cname, 0),
+        })
 
-        st.markdown("---")
-        c_ren, c_del_c = st.columns(2)
+    st.subheader(f"📋 Categories in `{project}` ({len(catalog_rows)} registered)")
+    if catalog_rows:
+        df_cat_summary = pd.DataFrame(catalog_rows)
+        st.dataframe(df_cat_summary, width="stretch", hide_index=True)
+    else:
+        st.info("No categories found in this project.")
 
-        with c_ren:
-            st.subheader("✏️ Rename Category")
-            sel_old = st.selectbox("Select Category to Rename", cat_counts["Category Name"].tolist(), key="rename_old")
-            new_name = st.text_input("New Category Name", placeholder="e.g. core_architecture")
+    st.markdown("---")
+
+    col_add, col_mig = st.columns(2)
+
+    with col_add:
+        st.subheader("➕ Define / Update Category")
+        st.write("Add a new category or update its description to help agents place memories appropriately.")
+
+        c_name_input = st.text_input("Category Identifier", placeholder="e.g. gameplay_mechanics", key="new_cat_name")
+        c_bucket_input = st.selectbox("Category Bucket", ["fact", "decision", "state", "constraint", "procedure", "preference"], key="new_cat_bucket")
+        c_desc_input = st.text_area("Category Description", placeholder="Clear description of what records belong in this category so agents and maintainers categorize correctly...", key="new_cat_desc")
+
+        if st.button("💾 Save Category Definition", disabled=not c_name_input.strip() or not c_desc_input.strip(), type="primary", use_container_width=True):
+            clean_cname = re.sub(r"[^a-zA-Z0-9_.-]", "_", c_name_input.strip().lower())
+            cat_defs[clean_cname] = {
+                "description": c_desc_input.strip(),
+                "bucket": c_bucket_input,
+                "updated_at": _iso_now()
+            }
+            save_project_categories(project, cat_defs)
+            st.success(f"Category `{clean_cname}` saved with description!")
+            time.sleep(0.5)
+            st.rerun()
+
+    with col_mig:
+        st.subheader("🚚 Migrate / Copy Category to Another Project")
+        st.write("Transfer an entire category and all its stored memories to another project partition.")
+
+        other_projects = [p for p in available_projects if p != project]
+        if not other_projects:
+            st.info("No other projects available. Provision a new project first.")
+        elif not all_cat_names:
+            st.info("No categories exist in this project yet to migrate.")
+        else:
+            mig_source_cat = st.selectbox("Select Category to Transfer", all_cat_names, key="mig_source_cat")
+            mig_target_proj = st.selectbox("Target Destination Project", other_projects, key="mig_target_proj")
+            mig_mode = st.radio("Transfer Mode", ["Copy (Keep records in current project)", "Move / Migrate (Transfer and remove from current project)"], key="mig_mode_sel")
+
+            src_count = counts_map.get(mig_source_cat, 0)
+            st.caption(f"Category `{mig_source_cat}` currently has **{src_count}** records in `{project}`.")
+
+            is_move = "Move" in mig_mode
+            btn_label = f"🚀 {'Move' if is_move else 'Copy'} Category `{mig_source_cat}` to `{mig_target_proj}`"
+
+            confirm_mig = True
+            if is_move:
+                confirm_mig = st.checkbox(f"Confirm: Permanently remove `{mig_source_cat}` from `{project}` after moving to `{mig_target_proj}`", key="chk_confirm_mig")
+
+            if st.button(btn_label, disabled=not confirm_mig or src_count == 0, type="secondary", use_container_width=True):
+                try:
+                    mode_str = "move" if is_move else "copy"
+                    transferred = migrate_or_copy_category(project, mig_target_proj, mig_source_cat, mode=mode_str)
+                    st.success(f"Successfully transferred {transferred} records to `{mig_target_proj}` in category `{mig_source_cat}`!")
+                    time.sleep(1.0)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Migration error: {e}")
+
+    st.markdown("---")
+    c_ren, c_del_c = st.columns(2)
+
+    with c_ren:
+        st.subheader("✏️ Rename Category")
+        if all_cat_names:
+            sel_old = st.selectbox("Select Category to Rename", all_cat_names, key="rename_old")
+            new_name = st.text_input("New Category Name", placeholder="e.g. core_architecture", key="new_name_ren")
             if st.button("Rename Category Across All Records", disabled=not new_name.strip(), use_container_width=True):
                 try:
-                    updated = rename_category(project, sel_old, new_name.strip())
-                    st.success(f"Renamed category '{sel_old}' to '{new_name.strip()}' for {updated} records!")
+                    clean_ren = re.sub(r"[^a-zA-Z0-9_.-]", "_", new_name.strip().lower())
+                    updated = rename_category(project, sel_old, clean_ren)
+                    if sel_old in cat_defs:
+                        cat_defs[clean_ren] = cat_defs.pop(sel_old)
+                        save_project_categories(project, cat_defs)
+                    st.success(f"Renamed category '{sel_old}' to '{clean_ren}' for {updated} records!")
                     time.sleep(0.5)
                     st.rerun()
                 except Exception as e:
                     st.error(f"Rename failed: {e}")
+        else:
+            st.info("No categories to rename.")
 
-        with c_del_c:
-            st.subheader("🗑️ Delete Entire Category")
-            sel_del = st.selectbox("Select Category to Purge", cat_counts["Category Name"].tolist(), key="purge_cat_sel")
-            cnt = int(cat_counts[cat_counts["Category Name"] == sel_del]["Record Count"].iloc[0])
-            st.write(f"This will permanently delete **{cnt}** records in `{sel_del}`.")
+    with c_del_c:
+        st.subheader("🗑️ Delete Entire Category")
+        if all_cat_names:
+            sel_del = st.selectbox("Select Category to Purge", all_cat_names, key="purge_cat_sel")
+            cnt = counts_map.get(sel_del, 0)
+            st.write(f"This will permanently delete **{cnt}** records in `{sel_del}` and its definition.")
             confirm_cat_del = st.checkbox(f"Yes, purge all {cnt} records in category '{sel_del}'", key="chk_del_cat")
             if st.button(f"Delete Category '{sel_del}'", disabled=not confirm_cat_del, type="secondary", use_container_width=True):
                 try:
                     deleted = delete_by_category(project, sel_del)
+                    if sel_del in cat_defs:
+                        cat_defs.pop(sel_del, None)
+                        save_project_categories(project, cat_defs)
                     st.success(f"Purged {deleted} records from '{sel_del}'!")
                     time.sleep(0.5)
                     st.rerun()
                 except Exception as e:
                     st.error(f"Delete failed: {e}")
-    else:
-        st.info(f"No records or categories found in {project}.")
+        else:
+            st.info("No categories to delete.")
 
 # ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
 # TAB 5: Token Estimate Lab
 # ---------------------------------------------------------------------------
 with tabs[4]:
+    if not require_active_project():
+        st.stop()
     st.title("🪙 Token Estimate Workbench")
     st.markdown("Rough token-count estimate for pasted text (heuristic; no external token library required).")
 
@@ -626,6 +826,8 @@ with tabs[4]:
 # TAB 6: Export & Import
 # ---------------------------------------------------------------------------
 with tabs[5]:
+    if not require_active_project():
+        st.stop()
     st.title(f"📥 Export & Import · {project}")
 
     e_col, i_col = st.columns(2)
@@ -645,7 +847,7 @@ with tabs[5]:
         }
         st.download_button(
             label=f"⬇️ Download {project} Dataset ({len(recs)} records as JSON)",
-            data=json.dumps(payload, indent=2),
+            data=json.dumps(payload, cls=NumpyEncoder, indent=2),
             file_name=f"{project}_memories_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
             mime="application/json",
             use_container_width=True,
@@ -676,6 +878,8 @@ with tabs[5]:
 # TAB 6: Delete & Purge (Project Tier Down)
 # ---------------------------------------------------------------------------
 with tabs[6]:
+    if not require_active_project():
+        st.stop()
     st.title("🗑️ Comprehensive Delete & Project Management")
     st.markdown("Straightforward controls to manage database lifecycles: from project-level deletion down to single entries.")
 
@@ -736,6 +940,8 @@ with tabs[6]:
 # TAB 7: Maintenance
 # ---------------------------------------------------------------------------
 with tabs[7]:
+    if not require_active_project():
+        st.stop()
     st.title("🛠️ Database Maintenance & Snapshots")
     
     col_t1, col_t2, col_t3 = st.columns(3)

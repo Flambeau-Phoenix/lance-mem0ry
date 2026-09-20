@@ -10,9 +10,7 @@ ExecStart=/opt/lance-memory/.venv/bin/python /opt/lance-memory/server/memory_ser
 Restart=always
 RestartSec=5
 Environment=PROJECT_MEMORIES_ROOT=/opt/lance-memory/project_memories
-Environment=PROJECT_MEMORY_PROJECTS=default
 Environment=OLLAMA_HOST=http://127.0.0.1:11434
-Environment=PROJECT_MEMORY=default
 Environment=LANCE_MEMORY_TRANSPORT=http
 Environment=LANCE_MEMORY_HOST=0.0.0.0
 Environment=LANCE_MEMORY_PORT=8768

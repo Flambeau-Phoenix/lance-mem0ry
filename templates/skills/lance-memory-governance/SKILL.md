@@ -9,31 +9,49 @@ compatibility: fastmcp, cursor, opencode, codex, antigravity
 Use the `lance-memory` MCP server (5 tools only). Connection details belong in
 `.mcp.json`. Tip embeddings: Ollama `nomic-embed-text` (768-dim).
 
-## 1. Project resolution
+## 1. Project Scoping & Partition Governance
 
-Always pass `project_id="<ACTIVE_PROJECT>"` (derive from repo root unless the
-user overrides). Never mix partitions.
+Agents **MUST NOT** invent arbitrary project IDs. New partitions are created exclusively by human maintainers via the Web Panel (`➕ Provision New Project`). Agents must autonomously identify which authorized partition their current workspace/task belongs to from the configured projects on the system:
 
-## 2. Categories
+- First call `inspect_memory_system(action="projects")` to obtain the authoritative project list and routing profiles. Folder-name equality is never required.
+- Always pass `project_id="<PROJECT_ID>"` explicitly matching the target codebase partition.
+- If the nearest applicable `AGENTS.md` declares `lance_memory_project_id: <PROJECT_ID>`, use it when authorized. Otherwise choose the best contextual fit from project purpose, task, agent identity, aliases, workspace hints, ID tokens, and categories.
+- A close-but-not-identical folder name is not a reason to refuse memory. There is no human-selected "Active Project" and no server-side default; missing or unknown project IDs are rejected.
+- Never mix partitions across unrelated codebases.
 
-| Category | Bucket | Verified | When |
+## 2. Category Governance & Selection
+
+Agents **MUST NOT** invent arbitrary category strings. Every memory commit must use an existing category defined in the project's category registry.
+
+To discover all valid categories and their authoritative descriptions for a project:
+```python
+inspect_memory_system(action="categories", project_id="<PROJECT_ID>")
+```
+
+Always read category descriptions to choose the most appropriate category for your entry.
+
+### Baseline Categories (Standard in All Partitions)
+
+| Category | Bucket | Verified | Description / When |
 |---|---|---|---|
-| `key_facts` | `fact` | `true` | After proof |
-| `architectural_decisions` | `decision` | `true` | After ratification |
-| `ongoing_tasks` | `state` | `false` | Plans / WIP |
-| `session_handoff` | `state` | `false` | Milestone continuity |
+| `key_facts` | `fact` | `true` | Ratified facts, verified patterns, stable APIs, and configuration constants (after proof). |
+| `architectural_decisions` | `decision` | `true` | System architecture, design choices, invariants, patterns, and trade-offs. |
+| `ongoing_tasks` | `state` | `false` | WIP blueprints, hypotheses, and pending implementation steps. |
+| `session_handoff` | `state` | `false` | Session summaries, milestones reached, and next action items. |
 
-Blueprints are never facts. Only verified working code/fixes get `verified=true`.
+Additional project-specific categories can be defined by administrators in `categories.json`.
 
-## 3. Before / During / After
+Blueprints and hypotheses are never facts. Only verified working code/fixes get `verified=true`.
 
-1. **Before:** `recall(project_id=..., query=..., search_type="semantic"|"symbol"|"recent")`
-2. **During:** `commit_memory(..., type="discovery", metadata={category:"ongoing_tasks", verified:false})`
-3. **After proof:** `commit_memory(..., type="promotion", metadata={supersedes_id, category, evidence})`  
-   or fresh discovery with `verified=true` / `key_facts` when there was no draft
-4. **Milestone:** `commit_memory(..., type="handoff", metadata={shipped, open_items, paths, ...})`
+## 3. Before / During / After Workflow
 
-## 4. The five tools
+1. **Before:** `recall(project_id="<PROJECT_ID>", query=..., search_type="semantic"|"symbol"|"recent")`
+2. **During:** `commit_memory(project_id="<PROJECT_ID>", ..., type="discovery", metadata={category:"ongoing_tasks", verified:false})`
+3. **After proof:** `commit_memory(project_id="<PROJECT_ID>", ..., type="promotion", metadata={supersedes_id, category:"key_facts", evidence})`  
+   or fresh discovery with `verified=true` / ratified category when there was no prior draft
+4. **Milestone:** `commit_memory(project_id="<PROJECT_ID>", ..., type="handoff", metadata={shipped, open_items, paths, ...})`
+
+## 4. The Five Tools
 
 ### `recall`
 `search_type`: `semantic` | `symbol` | `recent` | `id`  
@@ -41,7 +59,7 @@ Blueprints are never facts. Only verified working code/fixes get `verified=true`
 
 ### `commit_memory`
 `type`: `discovery` | `handoff` | `promotion`  
-Promotion requires `metadata.supersedes_id`.
+Promotion requires `metadata.supersedes_id`. Category must be a recognized category.
 
 ### `modify_memory`
 `action`: `update` | `delete` | `archive` | `purge`  
@@ -51,37 +69,42 @@ Purge needs `patch_data.confirm=true` for a full project wipe.
 `action`: `begin` | `read` | `write` | `flush` (working-memory turns)
 
 ### `inspect_memory_system`
-`action`: `health` | `stats` | `maintenance_scan` | `history`
+`action`: `projects` | `health` | `stats` | `maintenance_scan` | `history` | `categories`
 
 ```python
-recall(project_id="<ACTIVE_PROJECT>", query="migrations", search_type="semantic", limit=8)
+# Check categories and their descriptions before recording memories
+inspect_memory_system(action="categories", project_id="<PROJECT_ID>")
 
+# Search relevant context
+recall(project_id="<PROJECT_ID>", query="authentication flow", search_type="semantic", limit=8)
+
+# Log WIP task
 commit_memory(
-    project_id="<ACTIVE_PROJECT>",
-    text="Blueprint: try X",
+    project_id="<PROJECT_ID>",
+    text="Blueprint: Implement OAuth token refresh retry policy",
     type="discovery",
     metadata={"category": "ongoing_tasks", "verified": False},
 )
 
+# Promote to verified fact
 commit_memory(
-    project_id="<ACTIVE_PROJECT>",
-    text="",
+    project_id="<PROJECT_ID>",
+    text="Verified OAuth refresh policy conforms to retry backoff specification.",
     type="promotion",
     metadata={
         "supersedes_id": "<DRAFT_ID>",
         "category": "key_facts",
-        "evidence": "pytest passed",
+        "evidence": "unit tests passed and verified against mock server",
     },
 )
 
+# End-of-session handoff
 commit_memory(
-    project_id="<ACTIVE_PROJECT>",
-    text="Milestone done",
+    project_id="<PROJECT_ID>",
+    text="Session handoff: completed token refresh policy implementation.",
     type="handoff",
-    metadata={"shipped": "...", "open_items": "...", "paths": "..."},
+    metadata={"shipped": "Token retry policy", "open_items": "None", "paths": "src/auth/client.py"},
 )
-
-inspect_memory_system(action="health")
 ```
 
 ## 5. Safety

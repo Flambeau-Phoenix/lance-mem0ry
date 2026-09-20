@@ -93,12 +93,46 @@ def test_templates_and_services_unified():
     skill_content = skill_file.read_text(encoding="utf-8")
     assert "name: lance-memory-governance" in skill_content
     assert "arch-memory" not in skill_content.lower()
+    assert 'inspect_memory_system(action="projects")' in skill_content
+    assert "lance_memory_project_id" in skill_content
+
+    for service_file in systemd_files:
+        service_content = service_file.read_text(encoding="utf-8")
+        assert "Environment=PROJECT_MEMORY=" not in service_content
+
+
+def test_server_project_selection_is_contextual_and_authorized(tmp_path, monkeypatch):
+    monkeypatch.setenv("PROJECT_MEMORIES_ROOT", str(tmp_path))
+    monkeypatch.delenv("PROJECT_MEMORY_PROJECTS", raising=False)
+    import server.memory_server as ms
+
+    with pytest.raises(ValueError, match="project_id is required"):
+        ms.resolve_project("")
+    with pytest.raises(ValueError, match="unknown or unauthorized"):
+        ms.resolve_project("invented-folder-name")
+
+    project_dir = tmp_path / "ExampleAgentMemory"
+    project_dir.mkdir()
+    assert ms.resolve_project("exampleagentmemory") == "ExampleAgentMemory"
+
+    profile = ms.project_routing_profile("ExampleAgentMemory")
+    assert profile["project_id"] == "ExampleAgentMemory"
+    assert profile["id_tokens"] == ["example", "agent", "memory"]
+    assert profile["category_signals"]
+
+
+def test_blank_initializer_does_not_seed_default(monkeypatch):
+    monkeypatch.delenv("PROJECT_MEMORY_PROJECTS", raising=False)
+    from server.init_project_memories import seed_project_names
+
+    assert seed_project_names() == []
 
 
 def test_server_record_update_and_purge(tmp_path, monkeypatch):
     monkeypatch.setenv("PROJECT_MEMORIES_ROOT", str(tmp_path))
     import server.memory_server as ms
     monkeypatch.setattr(ms, "embed_text", lambda text: [0.1] * 768)
+    (tmp_path / "TestProj").mkdir()
 
     # 1. Create discovery record
     rec = ms.record_discovery_impl(
@@ -146,6 +180,7 @@ def test_web_panel_routes(tmp_path, monkeypatch):
     monkeypatch.setenv('PROJECT_MEMORIES_ROOT', str(tmp_path))
     import server.memory_server as ms
     monkeypatch.setattr(ms, 'embed_text', lambda t: [0.05] * 768)
+    (tmp_path / 'WebTest').mkdir()
 
     mcp = ms.build_mcp()
     client = TestClient(mcp.http_app())

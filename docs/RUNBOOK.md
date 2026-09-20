@@ -142,8 +142,7 @@ a second LanceDB root or hardcode the project name into the server.
 | Variable | Suggested value | Purpose |
 |---|---|---|
 | `PROJECT_MEMORIES_ROOT` | `/opt/lance-memory/project_memories` | Partition parent |
-| `PROJECT_MEMORY` | your default project | Fallback when a caller omits one |
-| `PROJECT_MEMORY_PROJECTS` | optional | Comma-separated projects to pre-seed |
+| `PROJECT_MEMORY_PROJECTS` | optional | Comma-separated authorized projects to pre-seed and expose through `inspect_memory_system(action="projects")`; omit for a blank slate |
 | `OLLAMA_HOST` | `http://127.0.0.1:11434` | Embedding service |
 | `LANCE_MEMORY_TRANSPORT` | `http` | FastMCP transport |
 | `ARCH_MEMORY_HOST` | `0.0.0.0` | Service bind host |
@@ -156,7 +155,8 @@ a second LanceDB root or hardcode the project name into the server.
 ## 8. Troubleshooting
 
 1. `inspect_memory_system(action="health")` — verify service, partition paths, and Ollama.
-2. `inspect_memory_system(action="stats", project_id="<PROJECT>")` — confirm exact project name and row counts.
+2. `inspect_memory_system(action="projects")` — inspect authorized contextual routing profiles; folder-name equality is not required.
+3. `inspect_memory_system(action="stats", project_id="<PROJECT>")` — confirm the selected canonical project ID and row counts.
 3. If writes fail, verify the project name and filesystem permissions on `PROJECT_MEMORIES_ROOT`.
 4. If recall is empty, try `search_type="recent"` and confirm records are `status="active"`.
 5. If embedding dimensions differ from 768, stop writes and verify the `nomic-embed-text` model is pulled.
@@ -186,7 +186,7 @@ The FastMCP HTTP service embeds an interactive Web Control Panel directly on the
 
 - **URL:** `http://<HOST>:8768/` or `http://<HOST>:8768/panel`
 - **Features:**
-  - Partition switcher (`FlamBot`, `SolarFlare`, `EventHorizon`, `FareverAPI`, etc.)
+  - Partition switcher (e.g. `my-project`, `core-service`, etc.)
   - Multi-mode search (`semantic`, `symbol`, `recent`, `id`) with bucket and category filtering
   - Inline memory creator and editor with automatic vector re-embedding
   - One-click promotion from unverified blueprints to ratified facts

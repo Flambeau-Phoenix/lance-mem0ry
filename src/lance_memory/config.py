@@ -6,7 +6,7 @@ from typing import Any
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
-    "project": os.environ.get("PROJECT_MEMORY", ""),
+    "project": "",
     "vector_store": {
         "provider": "lancedb",
         "config": {
@@ -99,4 +99,3 @@ def load_config(override: dict | None = None) -> dict:
     uri = Path(cfg["vector_store"]["config"]["uri"])
     uri.mkdir(parents=True, exist_ok=True)
     return cfg
-

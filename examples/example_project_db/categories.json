@@ -1,0 +1,26 @@
+{
+  "key_facts": {
+    "description": "Ratified facts, verified patterns, stable APIs, and configuration constants.",
+    "bucket": "fact"
+  },
+  "architectural_decisions": {
+    "description": "System architecture, design choices, invariants, patterns, and trade-offs.",
+    "bucket": "decision"
+  },
+  "ongoing_tasks": {
+    "description": "WIP blueprints, hypotheses, and pending implementation steps.",
+    "bucket": "state"
+  },
+  "session_handoff": {
+    "description": "Session summaries, milestones reached, and next action items.",
+    "bucket": "state"
+  },
+  "api_reference": {
+    "description": "Verified external and internal API signatures, client bindings, and protocols.",
+    "bucket": "fact"
+  },
+  "coding_standards": {
+    "description": "Project-specific coding guidelines, error handling rules, and conventions.",
+    "bucket": "decision"
+  }
+}

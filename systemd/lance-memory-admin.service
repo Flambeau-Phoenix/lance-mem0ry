@@ -12,8 +12,6 @@ Restart=on-failure
 RestartSec=5
 EnvironmentFile=-/etc/lance-memory/admin.env
 Environment=PROJECT_MEMORIES_ROOT=/opt/lance-memory/project_memories
-Environment=PROJECT_MEMORY_PROJECTS=default
-Environment=PROJECT_MEMORY=default
 Environment=OLLAMA_HOST=http://127.0.0.1:11434
 Environment=LANCE_MEMORY_HTTP_URL=http://127.0.0.1:8768/mcp
 

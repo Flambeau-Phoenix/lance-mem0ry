@@ -459,7 +459,7 @@ class LanceMemory:
     def _resolve_project(self, project: str | None) -> str:
         resolved = (project or self.config.get("project") or "").strip()
         if not resolved:
-            raise ValueError("project is required (or set PROJECT_MEMORY)")
+            raise ValueError("project is required; pass it explicitly")
         return resolved
 
 
