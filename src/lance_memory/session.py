@@ -145,8 +145,8 @@ class SessionMemory:
         return "\n".join(parts)
 
 
-class AgentSession(SessionMemory):
-    """First-class SessionMemory tailored for autonomous agent loops."""
+class NanobotSession(SessionMemory):
+    """First-class SessionMemory tailored for Nanobot autonomous agent loops."""
     def __init__(
         self,
         project: str,
@@ -157,9 +157,9 @@ class AgentSession(SessionMemory):
     ):
         super().__init__(
             project=project,
-            user_id="agent",
-            agent_id="agent",
-            session_id=session_id or f"session-{uuid.uuid4().hex[:8]}",
+            user_id="nanobot",
+            agent_id="nanobot",
+            session_id=session_id or f"nanobot-{uuid.uuid4().hex[:8]}",
             long_term=long_term,
             max_tokens=max_tokens,
             max_turns=max_turns,

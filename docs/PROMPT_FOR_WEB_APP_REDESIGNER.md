@@ -109,15 +109,15 @@ The new web portal should have a modern, sleek dark-mode aesthetic (e.g. Tailwin
 Before writing code, inspect these curated resources in the repository:
 
 - **Backend REST API Requirements & Architecture**:  
-  [`docs/WEB_PORTAL_BACKEND_REQUIREMENTS.md`](file:///g:/Lance%20Memory%20Tool/lance-memory/docs/WEB_PORTAL_BACKEND_REQUIREMENTS.md)
+  [`docs/WEB_PORTAL_BACKEND_REQUIREMENTS.md`](./WEB_PORTAL_BACKEND_REQUIREMENTS.md)
 - **Complete Tool & LanceDB Schema Reference**:  
-  [`docs/MEMORY_SYSTEM_REFERENCE.md`](file:///g:/Lance%20Memory%20Tool/lance-memory/docs/MEMORY_SYSTEM_REFERENCE.md)
+  [`docs/MEMORY_SYSTEM_REFERENCE.md`](./MEMORY_SYSTEM_REFERENCE.md)
 - **Standalone Working LanceDB Database (Ready to Query)**:  
-  [`examples/example_project_db/`](file:///g:/Lance%20Memory%20Tool/lance-memory/examples/example_project_db)
+  [`examples/example_project_db/`](../examples/example_project_db)
 - **Standalone JSON Mock Export (7 sample records with 768-dim vectors)**:  
-  [`examples/example_database_export.json`](file:///g:/Lance%20Memory%20Tool/lance-memory/examples/example_database_export.json)
+  [`examples/example_database_export.json`](../examples/example_database_export.json)
 - **Existing Streamlit Implementation (for logic reference)**:  
-  [`server/admin_app.py`](file:///g:/Lance%20Memory%20Tool/lance-memory/server/admin_app.py)
+  [`server/admin_app.py`](../server/admin_app.py)
 
 ---
 

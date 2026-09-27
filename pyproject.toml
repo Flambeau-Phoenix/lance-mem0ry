@@ -33,6 +33,7 @@ lance-memory-api = "lance_memory.api:app"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# src/lance_memory is auto-discovered by hatchling for wheels/editable installs.
 [tool.hatch.build.targets.wheel]
 packages = ["src/lance_memory"]
 
@@ -40,9 +41,15 @@ packages = ["src/lance_memory"]
 include = [
     "src/lance_memory",
     "tests",
-    "scripts",
+    "server",
+    "examples",
+    "docs",
+    "templates",
+    "systemd",
     "README.md",
+    "LICENSE",
     "pyproject.toml",
+    ".env.example",
 ]
 
 [tool.ruff]

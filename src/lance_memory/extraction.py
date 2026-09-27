@@ -20,37 +20,60 @@ Rules:
 """
 
 
+def _first_env(*names: str, default: str = "") -> str:
+    for name in names:
+        val = os.environ.get(name)
+        if val is not None and str(val).strip() != "":
+            return str(val)
+    return default
+
+
 class Extractor:
     def __init__(self, llm_config: dict):
         cfg = llm_config.get("config", {})
-        self.provider = llm_config.get("provider", "ollama")
+        raw_provider = llm_config.get("provider", "ollama")
+        # Normalize legacy "butter" to openai_compatible
+        self.provider = (
+            "openai_compatible" if raw_provider == "butter" else raw_provider
+        )
+        is_oai_compat = self.provider in ("openai_compatible", "openai", "butter")
         default_model = (
-            os.environ.get("EXTRACTION_LLM_MODEL", "local-model")
-            if self.provider == "openai_compatible"
+            _first_env("EXTRACTION_LLM_MODEL", "LANCE_MEMORY_LLM", "BUTTER_MODEL", default="gpt-4o-mini")
+            if is_oai_compat
             else "llama3.2:3b"
         )
         self.model = cfg.get("model", default_model)
         self.temperature = cfg.get("temperature", 0.1)
         self.max_tokens = cfg.get("max_tokens", 2000)
 
-        default_base = (
-            os.environ.get("EXTRACTION_LLM_URL", "http://127.0.0.1:8080/v1")
-            if self.provider == "openai_compatible"
-            else "http://127.0.0.1:11434/v1"
-            if self.provider == "ollama"
-            else None
-        )
+        if is_oai_compat:
+            default_base = _first_env(
+                "EXTRACTION_LLM_URL",
+                "LANCE_MEMORY_LLM_BASE",
+                "OPENAI_BASE_URL",
+                "BUTTER_URL",
+                default="http://127.0.0.1:8080/v1",
+            )
+        elif self.provider == "ollama":
+            default_base = "http://127.0.0.1:11434/v1"
+        else:
+            default_base = None
         base_url = cfg.get(
             "base_url",
             os.environ.get("LANCE_MEMORY_LLM_BASE", default_base),
         )
-        api_key = cfg.get(
-            "api_key",
-            os.environ.get(
-                "EXTRACTION_LLM_API_KEY" if self.provider == "openai_compatible" else "OPENAI_API_KEY",
-                "dummy" if self.provider == "openai_compatible" else "ollama" if self.provider == "ollama" else "",
-            ),
-        )
+        if is_oai_compat:
+            default_key = _first_env(
+                "EXTRACTION_LLM_API_KEY",
+                "OPENAI_API_KEY",
+                "BUTTER_API_KEY",
+                default="dummy",
+            )
+        elif self.provider == "ollama":
+            default_key = "ollama"
+        else:
+            default_key = ""
+        api_key = cfg.get("api_key", default_key)
         try:
             if base_url:
                 self._client = OpenAI(base_url=base_url, api_key=api_key or "dummy")

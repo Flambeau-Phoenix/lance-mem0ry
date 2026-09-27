@@ -10,7 +10,7 @@ from .session import SessionMemory
 from .harness import MaintenanceHarness
 
 
-mcp = FastMCP("lancedb-memory")
+mcp = FastMCP("lance-memory")
 _memory: LanceMemory | None = None
 _sessions: dict[str, SessionMemory] = {}
 

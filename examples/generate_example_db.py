@@ -1,24 +1,30 @@
 #!/usr/bin/env python3
-"""Build a standalone example LanceDB database and JSON export for testing and backend development."""
+"""Build a standalone example LanceDB database and JSON export for testing.
+
+Runs offline without API keys. Synthetic 768-dim unit vectors are used
+(no Ollama/OpenAI calls). LanceDB + pyarrow are optional: if unavailable,
+categories.json and example_database_export.json are still written.
+"""
 from __future__ import annotations
 
 import json
-import os
+import math
+import random
 import shutil
 import tarfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-import math
-import random
+
 
 def make_unit_vector(seed_val: int) -> list[float]:
     rnd = random.Random(seed_val)
     vec = [rnd.gauss(0.0, 1.0) for _ in range(768)]
-    norm = math.sqrt(sum(x * x for x in vec))
+    norm = math.sqrt(sum(x * x for x in vec)) or 1.0
     return [round(x / norm, 6) for x in vec]
 
-def generate():
+
+def generate() -> None:
     script_dir = Path(__file__).resolve().parent
     out_dir = script_dir / "example_project_db"
     if out_dir.exists():
@@ -28,28 +34,28 @@ def generate():
     categories = {
         "key_facts": {
             "description": "Ratified facts, verified patterns, stable APIs, and configuration constants.",
-            "bucket": "fact"
+            "bucket": "fact",
         },
         "architectural_decisions": {
             "description": "System architecture, design choices, invariants, patterns, and trade-offs.",
-            "bucket": "decision"
+            "bucket": "decision",
         },
         "ongoing_tasks": {
             "description": "WIP blueprints, hypotheses, and pending implementation steps.",
-            "bucket": "state"
+            "bucket": "state",
         },
         "session_handoff": {
             "description": "Session summaries, milestones reached, and next action items.",
-            "bucket": "state"
+            "bucket": "state",
         },
         "api_reference": {
             "description": "Verified external and internal API signatures, client bindings, and protocols.",
-            "bucket": "fact"
+            "bucket": "fact",
         },
         "coding_standards": {
             "description": "Project-specific coding guidelines, error handling rules, and conventions.",
-            "bucket": "decision"
-        }
+            "bucket": "decision",
+        },
     }
 
     with open(out_dir / "categories.json", "w", encoding="utf-8") as f:
@@ -68,7 +74,7 @@ def generate():
             "tags": ["redis", "networking", "caching"],
             "agent_id": "backend-agent",
             "source_ref": "src/config/redis.json",
-            "status": "active"
+            "status": "active",
         },
         {
             "text": "OAuth Token endpoint contract: POST /oauth/token accepts grant_type, client_id, client_secret, and code with response returning access_token and refresh_token.",
@@ -82,7 +88,7 @@ def generate():
             "tags": ["auth", "oauth2", "api-contract"],
             "agent_id": "api-agent",
             "source_ref": "src/auth/routes.py",
-            "status": "active"
+            "status": "active",
         },
         {
             "text": "All vector embeddings must be exactly 768 dimensions using nomic-embed-text for LanceDB compatibility.",
@@ -96,7 +102,7 @@ def generate():
             "tags": ["lancedb", "embeddings", "ollama"],
             "agent_id": "architect",
             "source_ref": "docs/architecture.md",
-            "status": "active"
+            "status": "active",
         },
         {
             "text": "Blueprint: Implement distributed event bus adapter using Apache Kafka with at-least-once delivery semantics and dead-letter queue routing.",
@@ -110,7 +116,7 @@ def generate():
             "tags": ["kafka", "events", "blueprint", "wip"],
             "agent_id": "orchestrator-agent",
             "source_ref": "src/events/bus.py",
-            "status": "active"
+            "status": "active",
         },
         {
             "text": "All HTTP REST API error responses must adhere strictly to RFC 7807 Problem Details with type, title, status, and detail fields.",
@@ -124,7 +130,7 @@ def generate():
             "tags": ["rest", "rfc7807", "error-handling", "standards"],
             "agent_id": "linter-guard",
             "source_ref": "src/api/errors.py",
-            "status": "active"
+            "status": "active",
         },
         {
             "text": "Session Handoff: Completed core JWT validation middleware and unit tests. Next step is wiring refresh token rotation.",
@@ -138,7 +144,7 @@ def generate():
             "tags": ["handoff", "auth", "milestone"],
             "agent_id": "developer-agent",
             "source_ref": "src/auth/jwt.py",
-            "status": "active"
+            "status": "active",
         },
         {
             "text": "Database transaction isolation level is set to SERIALIZABLE on account balance transfers to prevent race conditions.",
@@ -152,8 +158,8 @@ def generate():
             "tags": ["database", "acid", "transactions"],
             "agent_id": "dba-agent",
             "source_ref": "src/db/transactions.py",
-            "status": "active"
-        }
+            "status": "active",
+        },
     ]
 
     rows = []
@@ -161,41 +167,47 @@ def generate():
         rec_id = str(uuid.uuid4())
         mem_id = uuid.uuid4().hex
         vec = make_unit_vector(idx + 100)
-        rows.append({
-            "text": d["text"],
-            "category": d["category"],
-            "symbol": d["symbol"],
-            "verified": d["verified"],
-            "created_at": d["created_at"],
-            "record_id": rec_id,
-            "entity_type": d["entity_type"],
-            "memory_id": mem_id,
-            "project_id": d["project_id"],
-            "bucket": d["bucket"],
-            "tags": d["tags"],
-            "agent_id": d["agent_id"],
-            "run_id": "run-" + uuid.uuid4().hex[:8],
-            "source_type": "agent",
-            "source_ref": d["source_ref"],
-            "updated_at": d["created_at"],
-            "status": d["status"],
-            "supersedes_id": "",
-            "vector": vec
-        })
+        rows.append(
+            {
+                "text": d["text"],
+                "category": d["category"],
+                "symbol": d["symbol"],
+                "verified": d["verified"],
+                "created_at": d["created_at"],
+                "record_id": rec_id,
+                "entity_type": d["entity_type"],
+                "memory_id": mem_id,
+                "project_id": d["project_id"],
+                "bucket": d["bucket"],
+                "tags": d["tags"],
+                "agent_id": d["agent_id"],
+                "run_id": "run-" + uuid.uuid4().hex[:8],
+                "source_type": "agent",
+                "source_ref": d["source_ref"],
+                "updated_at": d["created_at"],
+                "status": d["status"],
+                "supersedes_id": "",
+                "vector": vec,
+            }
+        )
 
-    # If lancedb is available in python, build records.lance dataset
+    # Optional LanceDB dataset (no API keys; synthetic vectors only).
+    lance_built = False
     try:
-        import lancedb
-        from server.memory_server import ArchitecturalMemory, TABLE_NAME, rebuild_fts
+        import lancedb  # type: ignore
+
         db = lancedb.connect(str(out_dir))
-        table = db.create_table(TABLE_NAME, schema=ArchitecturalMemory)
-        table.add(rows)
-        rebuild_fts(table)
+        table = db.create_table("records", data=rows, mode="overwrite")
+        for col in ("text", "symbol"):
+            try:
+                table.create_fts_index(col, replace=True)
+            except Exception as fts_err:
+                print(f"FTS index for {col} skipped: {fts_err}")
+        lance_built = True
         print(f"Created LanceDB dataset in: {out_dir}")
     except Exception as e:
-        print(f"LanceDB build skipped (will build on host): {e}")
+        print(f"LanceDB build skipped (install lancedb to generate records.lance): {e}")
 
-    # Build standalone JSON export
     export_payload = {
         "project_id": "example_project",
         "schema_version": "2.0.0",
@@ -205,7 +217,7 @@ def generate():
         "embedding_model": "nomic-embed-text",
         "embedding_dimensions": 768,
         "categories": categories,
-        "records": rows
+        "records": rows,
     }
 
     json_path = script_dir / "example_database_export.json"
@@ -213,12 +225,19 @@ def generate():
         json.dump(export_payload, f, indent=2)
     print(f"Created JSON export in: {json_path}")
 
-    # Archive tarball
     tar_path = script_dir / "example_project_db.tar.gz"
-    if (out_dir / "records.lance").exists():
+    if lance_built and (out_dir / "records.lance").exists():
         with tarfile.open(tar_path, "w:gz") as tar:
             tar.add(out_dir, arcname="example_project_db")
         print(f"Created compressed archive in: {tar_path}")
+    else:
+        if tar_path.exists():
+            tar_path.unlink()
+        print(
+            "Skipped example_project_db.tar.gz (no records.lance). "
+            "Install lancedb and re-run this script to generate it."
+        )
+
 
 if __name__ == "__main__":
     generate()

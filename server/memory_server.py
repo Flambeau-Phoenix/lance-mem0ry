@@ -1,4 +1,4 @@
-"""Lance Memory (lance-mem0ry) FastMCP — named project LanceDB + Ollama nomic-embed-text.
+"""Memory Portal FastMCP — named project LanceDB + Ollama nomic-embed-text.
 
 Durable Memory v2: the v1 columns (text/category/symbol/verified/created_at) are
 retained verbatim because admin_app.py, admin_cli.py, and any external AST or
@@ -38,6 +38,10 @@ OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/"
 EMBED_MODEL = "nomic-embed-text"
 EMBED_DIM = 768
 TABLE_NAME = "records"
+
+# Synthetic label for records whose stored category is blank. Kept out of the
+# categories.json registry; surfaced by the web panel so counts stay honest.
+UNCATEGORIZED = "(uncategorized)"
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _candidate_memories_root = (
@@ -371,6 +375,30 @@ def table_columns(table: Any) -> set[str]:
         return set(table.schema.names)
     except Exception:
         return set()
+
+
+def category_counts(project: Optional[str] = None, active_only: bool = True) -> dict[str, int]:
+    """Count active records per category straight from the table.
+
+    Categories that appear in the data but are absent from categories.json are
+    still counted (and surfaced as ``unregistered`` by the web panel). Without
+    this, a partition whose records use an unregistered category renders an
+    all-zero category table even though the partition holds records.
+    """
+    try:
+        table = get_table(project)
+        frame = table.to_pandas()
+    except Exception:
+        return {}
+    if active_only and "status" in frame.columns:
+        frame = frame[frame["status"] == "active"]
+    if "category" not in frame.columns:
+        return {}
+    counts: dict[str, int] = {}
+    for value in frame["category"].tolist():
+        name = str(value or "").strip() or UNCATEGORIZED
+        counts[name] = counts.get(name, 0) + 1
+    return counts
 
 
 def _row_public(row: dict) -> dict:
@@ -913,21 +941,29 @@ def _format_handoff_text(text: str, metadata: dict) -> str:
 def build_mcp():
     if FastMCP is None:
         raise RuntimeError("fastmcp not installed")
-    mcp = FastMCP("lance-memory")
+    mcp = FastMCP("memory-portal")
 
     # --- Web Control Panel & REST API Routes ---
-    from starlette.responses import HTMLResponse, JSONResponse
+    from starlette.responses import FileResponse, HTMLResponse, JSONResponse
 
     def _load_web_panel_html() -> str:
         panel_path = _SCRIPT_DIR / "static" / "index.html"
         if panel_path.exists():
             return panel_path.read_text(encoding="utf-8")
-        return "<html><body><h1>Lance Memory Control Panel</h1><p>Static index.html not found.</p></body></html>"
+        return "<html><body><h1>Memory Portal</h1><p>Static index.html not found.</p></body></html>"
 
     @mcp.custom_route("/", methods=["GET"])
     @mcp.custom_route("/panel", methods=["GET"])
     async def web_panel_page(request):
         return HTMLResponse(_load_web_panel_html())
+
+    @mcp.custom_route("/assets/{asset_path:path}", methods=["GET"])
+    async def web_panel_asset(request):
+        static_root = (_SCRIPT_DIR / "static").resolve()
+        asset = (static_root / "assets" / request.path_params["asset_path"]).resolve()
+        if static_root not in asset.parents or not asset.is_file():
+            return JSONResponse({"error": "asset not found"}, status_code=404)
+        return FileResponse(asset)
 
     @mcp.custom_route("/api/health", methods=["GET"])
     async def api_health(request):
@@ -942,14 +978,61 @@ def build_mcp():
 
         results = []
         for p in all_projects:
+            read_error = ""
             try:
                 table = get_table(p)
                 cnt = table.count_rows()
-                act = len(table.search().where("status = 'active'").limit(10_000).to_list())
-            except Exception:
+                cols = table_columns(table)
+                if "status" in cols:
+                    act = len(table.search().where("status = 'active'").limit(10_000).to_list())
+                else:
+                    # Pre-v2 tables have no status column; every row is live.
+                    act = cnt
+            except Exception as exc:
                 cnt, act = 0, 0
-            results.append({"name": p, "total_rows": cnt, "active_rows": act})
-        return JSONResponse({"projects": results})
+                read_error = str(exc)
+                print(f"Warning: project {p!r} unreadable: {exc}", file=sys.stderr)
+            routing = project_routing_profile(p)
+            categories = load_project_categories(p)
+            observed = category_counts(p)
+            category_view: dict[str, dict[str, Any]] = {}
+            for name, spec in categories.items():
+                category_view[name] = {
+                    **spec,
+                    "record_count": observed.get(name, 0),
+                    "unregistered": False,
+                }
+            for name, count in observed.items():
+                if name in category_view or name == UNCATEGORIZED:
+                    continue
+                category_view[name] = {
+                    "description": "",
+                    "bucket": bucket_for_category(name),
+                    "record_count": count,
+                    "unregistered": True,
+                }
+            entry: dict[str, Any] = {
+                "id": p,
+                "name": p,
+                "description": routing["description"],
+                "created_at": "",
+                "total_records": cnt,
+                "active_rows": act,
+                "categories": category_view,
+                "status": "healthy",
+                "embedding_model": EMBED_MODEL,
+                "embedding_dimensions": EMBED_DIM,
+                "fts_index_status": "ready",
+                "folder_path": (routing["workspace_hints"] or [""])[0],
+                "aliases": routing["aliases"],
+                "workspace_hints": routing["workspace_hints"],
+                "id_tokens": routing["id_tokens"],
+            }
+            if read_error:
+                entry["status"] = "error"
+                entry["error"] = read_error
+            results.append(entry)
+        return JSONResponse(results)
 
     @mcp.custom_route("/api/memories", methods=["GET"])
     async def api_get_memories(request):
@@ -1105,6 +1188,13 @@ def build_mcp():
         except Exception as e:
             return JSONResponse({"error": str(e)}, status_code=400)
 
+    try:
+        from .web_panel_api import register_web_panel_routes
+    except ImportError:
+        from web_panel_api import register_web_panel_routes
+    import time as _web_time
+    register_web_panel_routes(mcp, sys.modules[__name__], _web_time.time())
+
 
     # --- LanceMemory & Session Engine (internal; not exposed as MCP tools) ---
     from lance_memory.memory import LanceMemory
@@ -1118,7 +1208,7 @@ def build_mcp():
         p = resolve_project(p_name)
         if p not in _lance_instances:
             p_path = str(project_db_path(p))
-            prov = os.environ.get("ARCH_MEMORY_LLM_PROVIDER", os.environ.get("LANCE_MEMORY_LLM_PROVIDER", "openai"))
+            prov = os.environ.get("LANCE_MEMORY_LLM_PROVIDER", os.environ.get("ARCH_MEMORY_LLM_PROVIDER", "openai"))
             cfg = {
                 "vector_store": {
                     "config": {
@@ -1448,8 +1538,8 @@ def build_mcp():
         """Inspect projects, categories, health, stats, maintenance, or history.
 
         Start with action="projects" (no project_id needed). Match the current
-        workspace/task to the best-fit returned profile, then pass its canonical
-        ID to every project-scoped tool call and inspection action.
+        current workspace/task to the best-fit returned profile, then pass its
+        canonical ID to every project-scoped tool call and inspection action.
         """
         act = (action or "health").strip().lower()
 
@@ -1468,12 +1558,12 @@ def build_mcp():
                     "First use lance_memory_project_id from the nearest applicable "
                     "AGENTS.md when that ID is authorized. Otherwise select the best-fit "
                     "authorized project contextually from the workspace/repository "
-                    "purpose, current task, agent identity, ID tokens, aliases, workspace "
-                    "hints, and category descriptions. Folder-name equality is not "
-                    "required and a close-but-not-identical folder name is not a reason "
-                    "to refuse memory. Pass the returned canonical project_id on every "
-                    "project-scoped call. Ask the user only when two profiles are "
-                    "genuinely ambiguous; never invent an ID."
+                    "purpose, current task, agent identity, ID "
+                    "tokens, aliases, workspace hints, and category descriptions. "
+                    "Folder-name equality is not required and a close-but-not-identical "
+                    "folder name is not a reason to refuse memory. Pass the returned "
+                    "canonical project_id on every project-scoped call. Ask the user "
+                    "only when two profiles are genuinely ambiguous; never invent an ID."
                 ),
             }
 
@@ -1643,7 +1733,7 @@ def main(argv: Optional[list[str]] = None) -> None:
         mcp.run(transport=transport, host=host, port=port)
     else:
         raise ValueError(
-            "LANCE_MEMORY_TRANSPORT / ARCH_MEMORY_TRANSPORT must be stdio, sse, http, or streamable-http; "
+            "LANCE_MEMORY_TRANSPORT (ARCH_MEMORY_TRANSPORT fallback) must be stdio, sse, http, or streamable-http; "
             f"got {transport!r}"
         )
 

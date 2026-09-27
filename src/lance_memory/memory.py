@@ -97,16 +97,27 @@ class LanceMemory:
         cls,
         uri: str | None = None,
         base_url: str = "http://127.0.0.1:8080/v1",
-        model: str = "local-model",
+        model: str = "gpt-4o-mini",
         table: str = "memories",
     ) -> LanceMemory:
-        """Instantiate LanceMemory pre-configured for an OpenAI-compatible extraction proxy."""
+        """Instantiate LanceMemory with an OpenAI-compatible extraction endpoint."""
         cfg = openai_compatible_preset(base_url=base_url, model=model)
         if uri:
             cfg.setdefault("vector_store", {}).setdefault("config", {})["uri"] = uri
         if table:
             cfg.setdefault("vector_store", {}).setdefault("config", {})["table"] = table
         return cls(config=cfg)
+
+    @classmethod
+    def from_butter(
+        cls,
+        uri: str | None = None,
+        base_url: str = "http://127.0.0.1:8080/v1",
+        model: str = "gpt-4o-mini",
+        table: str = "memories",
+    ) -> LanceMemory:
+        """Deprecated alias for from_openai_compatible."""
+        return cls.from_openai_compatible(uri=uri, base_url=base_url, model=model, table=table)
 
 
     def add(
@@ -459,7 +470,7 @@ class LanceMemory:
     def _resolve_project(self, project: str | None) -> str:
         resolved = (project or self.config.get("project") or "").strip()
         if not resolved:
-            raise ValueError("project is required; pass it explicitly")
+            raise ValueError("project is required (or set PROJECT_MEMORY)")
         return resolved
 
 

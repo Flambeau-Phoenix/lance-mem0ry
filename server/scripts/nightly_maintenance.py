@@ -12,7 +12,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Allow import when ExecStart runs from the package checkout or arch_memory cwd.
+# Allow import when ExecStart runs from the package checkout cwd.
 _HERE = Path(__file__).resolve().parent
 _SERVER = _HERE.parent
 if str(_SERVER) not in sys.path:

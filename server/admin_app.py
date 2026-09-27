@@ -40,15 +40,15 @@ from memory_server import (
 SSE_URL = os.environ.get("LANCE_MEMORY_SSE_URL", os.environ.get("ARCH_MEMORY_SSE_URL", ""))
 HTTP_URL = os.environ.get("LANCE_MEMORY_HTTP_URL", os.environ.get("ARCH_MEMORY_HTTP_URL", "http://127.0.0.1:8768/mcp"))
 SERVICE_UNITS = (
-    "lance-memory-http.service",
-    "lance-memory-admin.service",
+    "memory-portal-http.service",
+    "memory-portal-admin.service",
 )
 
 # Extended entity types including Mem0 rules & directives
 EXTENDED_ENTITY_TYPES = ("Rule", "Directive", "Preference", "Hook", "UI Element", "Protocol", "State Schema", "Config", "General")
 
 st.set_page_config(
-    page_title="Lance Memory (lance-mem0ry) Studio",
+    page_title="Memory Portal Studio",
     page_icon="🧠",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -141,7 +141,7 @@ def extraction_llm_status() -> tuple[bool, str]:
 def journal(minutes: int = 15, lines: int = 150) -> str:
     try:
         result = subprocess.run(
-            ["journalctl", "-u", "lance-memory-http.service", "-u", "lance-memory-admin.service", f"--since=-{minutes} minutes", "-n", str(lines), "--no-pager", "-o", "short-iso"],
+            ["journalctl", "-u", "memory-portal-http.service", "-u", "memory-portal-admin.service", f"--since=-{minutes} minutes", "-n", str(lines), "--no-pager", "-o", "short-iso"],
             capture_output=True,
             text=True,
             timeout=8,
@@ -511,7 +511,7 @@ with tabs[1]:
 
     # Search & Filtering Bar
     col_q, col_cat_f, col_lim = st.columns([3, 2, 1])
-    search_q = col_q.text_input("🔍 Semantic / Hybrid Search", placeholder="e.g. SpaceCanvas, connection, token...")
+    search_q = col_q.text_input("🔍 Semantic / Hybrid Search", placeholder="e.g. Canvas, connection, token...")
     result_limit = col_lim.slider("Limit", 5, 500, 50)
 
     df_all = get_project_records(project, limit=result_limit)
@@ -543,7 +543,7 @@ with tabs[1]:
             with st.form("add_memory_form", clear_on_submit=True):
                 in_text = st.text_area("Memory Text / Note", placeholder="Enter architectural notes, code symbol, or fact...")
                 ca, cb = st.columns(2)
-                in_symbol = ca.text_input("Symbol / Name", placeholder="e.g. SpaceCanvas")
+                in_symbol = ca.text_input("Symbol / Name", placeholder="e.g. Canvas")
                 in_category = cb.text_input("Category", value="general")
                 cc, cd = st.columns(2)
                 in_entity = cc.selectbox("Entity Type", EXTENDED_ENTITY_TYPES, index=len(EXTENDED_ENTITY_TYPES) - 1)

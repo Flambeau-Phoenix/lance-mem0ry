@@ -69,7 +69,7 @@ flowchart TD
 The backend must interface directly with **LanceDB** (embedded columnar vector database using Apache Arrow).
 
 * **Directory Partitioning**:
-  - Root: `$PROJECT_MEMORIES_ROOT` (e.g. `/opt/eh-stack/app/lance-memory/project_memories`).
+  - Root: `$PROJECT_MEMORIES_ROOT` (e.g. `/opt/lance-memory/project_memories`).
   - Each project partition is an independent LanceDB dataset directory: `<PROJECT_MEMORIES_ROOT>/<project_id>/`.
   - Inside each project folder lives `records.lance`.
 * **Record Schema**:

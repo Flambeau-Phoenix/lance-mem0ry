@@ -6,7 +6,38 @@ venv/
 *.egg-info/
 dist/
 build/
-project_memories/
-backups/
+
+# Local runtime data (root-level only so examples/ stays publishable)
+/project_memories/
+/backups/
+/data/
+/memory/
+/storage/
+
+# Lance / DB artifacts outside the public example
+*.lance
+!examples/example_project_db/
+!examples/example_project_db/**
+*.sqlite
+*.db
+
+# Secrets / env
 .env
+.env.local
+.env.*.local
+*.pem
+*.key
+credentials*
+secrets*
+!.env.example
+
 *.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
+
+node_modules/
+coverage/

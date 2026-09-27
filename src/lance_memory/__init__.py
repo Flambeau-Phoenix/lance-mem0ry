@@ -1,6 +1,6 @@
 from .memory import LanceMemory, AsyncLanceMemory
-from .config import DEFAULT_CONFIG, load_config, openai_compatible_preset
-from .session import SessionMemory, AgentSession
+from .config import DEFAULT_CONFIG, load_config, openai_compatible_preset, butter_preset
+from .session import SessionMemory, NanobotSession
 
 __all__ = [
     "LanceMemory",
@@ -8,8 +8,8 @@ __all__ = [
     "DEFAULT_CONFIG",
     "load_config",
     "openai_compatible_preset",
+    "butter_preset",  # deprecated alias
     "SessionMemory",
-    "AgentSession",
+    "NanobotSession",
 ]
-__version__ = "1.0.0"
-
+__version__ = "1.1.0"

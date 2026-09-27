@@ -142,7 +142,7 @@ def cmd_status(_args: argparse.Namespace) -> int:
         "root": str(memories_root()),
         "ollama": OLLAMA_HOST,
         "model": EMBED_MODEL,
-        "units": {name: _unit_state(name) for name in ("lance-memory-http.service", "lance-memory-admin.service")},
+        "units": {name: _unit_state(name) for name in ("memory-portal-http.service", "memory-portal-admin.service")},
         "projects": [audit_project(name) for name in _projects("")],
     }
     print(json.dumps(payload, indent=2))

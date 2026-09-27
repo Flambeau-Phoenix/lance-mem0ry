@@ -145,7 +145,7 @@ a second LanceDB root or hardcode the project name into the server.
 | `PROJECT_MEMORY_PROJECTS` | optional | Comma-separated authorized projects to pre-seed and expose through `inspect_memory_system(action="projects")`; omit for a blank slate |
 | `OLLAMA_HOST` | `http://127.0.0.1:11434` | Embedding service |
 | `LANCE_MEMORY_TRANSPORT` | `http` | FastMCP transport |
-| `ARCH_MEMORY_HOST` | `0.0.0.0` | Service bind host |
+| `LANCE_MEMORY_HOST` | `0.0.0.0` | Service bind host (`ARCH_MEMORY_HOST` deprecated fallback) |
 | `LANCE_MEMORY_PORT` | `8768` | HTTP port |
 | `FASTMCP_STATELESS_HTTP` | `true` | Compatibility for stateless clients |
 | `EXTRACTION_LLM_URL` | optional | OpenAI-compatible proxy for fact extraction |

@@ -55,7 +55,7 @@ lance-memory/
 │   ├── .mcp.json                           #   MCP endpoint configuration
 │   ├── AGENTS.md                           #   Agent governance charter
 │   └── skills/lance-memory-governance/SKILL.md # Agent skill definition
-├── tests/test_project_memory.py            # Pytest test suite
+├── tests/test_lance_memory.py            # Pytest test suite
 └── pyproject.toml                          # Project configuration & dependencies
 ```
 
@@ -158,8 +158,14 @@ The Streamlit Web Console (`server/admin_app.py`, default port `8767`) provides:
 | `LANCE_MEMORY_TRANSPORT` | `stdio` | FastMCP transport (`http`, `sse`, or `stdio`) |
 | `LANCE_MEMORY_PORT` | `8768` | FastMCP HTTP daemon port |
 | `EXTRACTION_LLM_URL` | none | Optional OpenAI-compatible endpoint for memory extraction |
+| `LANCE_MEMORY_HOST` | `0.0.0.0` | FastMCP bind host (`ARCH_MEMORY_HOST` deprecated fallback) |
+| `LANCE_MEMORY_LLM_PROVIDER` | `ollama` | LLM provider (`openai_compatible` for HTTP proxies; legacy `butter` still accepted) |
 
 ---
+
+
+> **Deprecated env fallbacks:** `ARCH_MEMORY_*` and `BUTTER_*` are still read when the
+> canonical `LANCE_MEMORY_*` / `EXTRACTION_LLM_*` variables are unset. Prefer the canonical names.
 
 ## Health Check & Verification
 
