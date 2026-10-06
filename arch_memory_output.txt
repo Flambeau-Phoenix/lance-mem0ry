@@ -1,0 +1,9 @@
+./server/scripts/cutover_fresh_scaffold.sh:5:OLD_ROOT=/opt/eh-stack/app/arch_memory/project_memories
+./server/scripts/cutover_fresh_scaffold.sh:18:cd /opt/eh-stack/app/arch_memory
+./server/scripts/cutover_fresh_scaffold.sh:20:    /opt/eh-stack/app/arch_memory/.venv/bin/python init_project_memories.py
+./server/scripts/cutover_fresh_scaffold.sh:28:    rm -rf /opt/eh-stack/app/arch_memory/lance_memory
+./server/scripts/cutover_fresh_scaffold.sh:29:    cp -a /tmp/lance_memory_src_pkg/lance_memory /opt/eh-stack/app/arch_memory/lance_memory
+./server/scripts/cutover_fresh_scaffold.sh:31:if [ -d "/opt/eh-stack/app/arch_memory/.venv" ]; then
+./server/scripts/cutover_fresh_scaffold.sh:32:    /opt/eh-stack/app/arch_memory/.venv/bin/pip install -e /opt/eh-stack/app/lance-memory --quiet || true
+./server/scripts/migrate_ast_symbols.py:19:DEFAULT_DB_DIR = Path("/opt/eh-stack/app/arch_memory/project_memories/FlamBot")
+./server/scripts/migrate_ast_symbols.py:20:BACKUP_DIR = Path("/opt/eh-stack/app/arch_memory/backups")

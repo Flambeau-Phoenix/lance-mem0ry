@@ -1,0 +1,13 @@
+Tested earlier with pytest --cov=src --cov=server tests/.
+Total Coverage: 29%
+Untested areas:
+- `server/admin_app.py`: 0% (UI code)
+- `server/admin_cli.py`: 0% (CLI tool)
+- `src/lance_memory/api.py`: 0% (FastAPI logic)
+- `src/lance_memory/mcp_server.py`: 0%
+- `src/lance_memory/cli.py`: 0%
+Failing tests:
+- `test_blank_initializer_does_not_seed_default` (AssertionError: ['default'] == [])
+- `test_web_panel_routes` (AssertionError: len(rows) 2 != 1)
+Duplicate files:
+- `tests/test_lance_memory.py` and `tests/test_project_memory.py` are identical.
