@@ -1,0 +1,36 @@
+name: Bug report
+description: Something does not behave as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not attach real memory databases, credentials or private source.
+        Security problems go through the private advisory form instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what you got. Include the error text.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Smallest reproducer
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options: [MCP server, Web panel or REST API, Streamlit console, Library, CLI, Claude Code hooks, Docs]
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      placeholder: lance-memory 1.1.0, Python 3.12, LanceDB x.y, Ollama x.y, OS
+    validations:
+      required: true
