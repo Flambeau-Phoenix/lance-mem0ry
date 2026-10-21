@@ -45,6 +45,7 @@ All optional, set as environment variables:
 | `LANCE_MEMORY_PROJECT_ID` | from `AGENTS.md` | Project partition to use |
 | `LANCE_MEMORY_HOOK_LIMIT` | `8` | Recent notes loaded at session start (1 to 25) |
 | `LANCE_MEMORY_HOOK_WRITE` | `1` | Set to `0` for read-only mode: load memory, never write |
+| `LANCE_MEMORY_HOOK_DEDUP` | `1` | Set to `0` to write a checkpoint every time, even if nothing changed |
 | `LANCE_MEMORY_HOOK_TIMEOUT` | `4` | Seconds to wait for the server |
 | `LANCE_MEMORY_HOOK_DEBUG` | off | Set to `1` to print why a hook did nothing |
 
@@ -56,6 +57,19 @@ and whether the working tree is clean. They never contain your prompts, the
 transcript or file contents, and they are stored as `verified=false`, so they cannot
 be mistaken for ratified facts. For a meaningful summary the agent should still call
 `commit_memory(type="handoff")`; the session-start note reminds it to.
+
+## Keeping memory useful
+
+Checkpoints are meant to support your real notes, not bury them:
+
+- **No repeats.** Before writing, the hook looks at the project's newest checkpoint and
+  skips the write if the workspace state (folder, git branch, short commit, uncommitted
+  file count) is unchanged. The time and triggering event are not part of that comparison.
+- **At most one checkpoint on the way in.** At session start the hook over-fetches recent
+  notes and shows your real notes first-class plus only the single newest checkpoint, so
+  busy projects never fill the starting context with checkpoints.
+- **Project only.** Everything is scoped by `project_id`. The hook never sets a user or
+  agent identifier, so every agent working in the project sees and shares the same notes.
 
 ## Safety notes
 

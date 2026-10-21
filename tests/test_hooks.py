@@ -108,7 +108,8 @@ def test_session_start_injects_recent_memories(server, monkeypatch, capsys):
     assert "ignored row" not in payload["additionalContext"]
     call = server.calls[0]
     assert call["path"] == "/api/mcp/execute" and call["tool"] == "recall"
-    assert call["arguments"] == {"project_id": "demo", "search_type": "recent", "limit": 8}
+    # Over-fetches (3x) so thinning out auto-checkpoints still leaves enough real notes.
+    assert call["arguments"] == {"project_id": "demo", "search_type": "recent", "limit": 24}
 
 
 def test_session_start_caps_untrusted_text(server, monkeypatch, capsys):
@@ -140,7 +141,8 @@ def test_checkpoint_writes_unverified_handoff_without_private_paths(server, monk
     event = {"hook_event_name": "SessionEnd", "reason": "clear", "cwd": str(tmp_path)}
     code, out, _ = run(monkeypatch, capsys, "checkpoint", event)
     assert (code, out) == (0, "")
-    call = server.calls[0]
+    assert [c["tool"] for c in server.calls] == ["recall", "commit_memory"]  # de-dup check, then write
+    call = server.calls[-1]
     assert call["tool"] == "commit_memory"
     args = call["arguments"]
     assert args["project_id"] == "demo"
@@ -148,6 +150,45 @@ def test_checkpoint_writes_unverified_handoff_without_private_paths(server, monk
                                 "tags": ["auto-checkpoint"]}
     assert "SessionEnd: clear" in args["text"] and tmp_path.name in args["text"]
     assert str(tmp_path) not in args["text"]
+
+
+def checkpoint_row(text, tagged=True):
+    return {"text": text, "category": "session_handoff", "created_at": "2026-10-02T09:00:00Z",
+            "tags": ["auto-checkpoint", "session_handoff"] if tagged else []}
+
+
+def test_session_start_thins_out_auto_checkpoints(server, monkeypatch, capsys):
+    server.rows = [checkpoint_row(f"Auto checkpoint at 2026-10-0{i} 10:00 UTC (SessionEnd). Workspace: w.") for i in range(1, 6)]
+    server.rows[2:2] = [{"text": "Real note A", "category": "key_facts"}, {"text": "Real note B", "category": "key_facts"}]
+    server.rows.append({"text": "Real note C", "category": "key_facts"})
+    _, out, _ = run(monkeypatch, capsys, "session-start")
+    context = json.loads(out)["hookSpecificOutput"]["additionalContext"]
+    assert context.count("Auto checkpoint at") == 1  # only the newest checkpoint survives
+    assert all(f"Real note {x}" in context for x in "ABC")  # real notes are never crowded out
+    assert context.index("Auto checkpoint at 2026-10-01") < context.index("Real note A")  # order preserved
+
+
+def test_checkpoint_skips_when_workspace_unchanged(server, monkeypatch, capsys, tmp_path):
+    event = {"hook_event_name": "SessionEnd", "reason": "clear", "cwd": str(tmp_path)}
+    run(monkeypatch, capsys, "checkpoint", event)
+    stored = server.calls[-1]["arguments"]["text"]
+    server.calls.clear()
+    server.rows = [checkpoint_row(stored)]
+    run(monkeypatch, capsys, "checkpoint", dict(event, hook_event_name="PreCompact", reason="auto"))
+    assert [c["tool"] for c in server.calls] == ["recall"]  # same workspace state: nothing new written
+
+
+def test_checkpoint_writes_when_workspace_changed(server, monkeypatch, capsys, tmp_path):
+    server.rows = [checkpoint_row("Auto checkpoint at 2026-10-01 09:00 UTC (SessionEnd). Workspace: other-folder. "
+                                  "Written by the lance-mem0ry hook; use commit_memory(type='handoff') for a real summary.")]
+    run(monkeypatch, capsys, "checkpoint", {"hook_event_name": "SessionEnd", "cwd": str(tmp_path)})
+    assert [c["tool"] for c in server.calls] == ["recall", "commit_memory"]
+
+
+def test_checkpoint_dedup_can_be_disabled(server, monkeypatch, capsys, tmp_path):
+    monkeypatch.setenv("LANCE_MEMORY_HOOK_DEDUP", "0")
+    run(monkeypatch, capsys, "checkpoint", {"hook_event_name": "SessionEnd", "cwd": str(tmp_path)})
+    assert [c["tool"] for c in server.calls] == ["commit_memory"]  # no look-up at all
 
 
 def test_checkpoint_read_only_mode(server, monkeypatch, capsys):

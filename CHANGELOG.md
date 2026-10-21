@@ -13,6 +13,10 @@ Earlier history is in the Git log. Versions follow `pyproject.toml`.
 - Security policy, code of conduct, contributing guide, issue and pull-request
   templates, and a CI workflow for the hook tests.
 
+- Hook checkpoints no longer pile up: a checkpoint is skipped when the workspace state is
+  unchanged since the last one (`LANCE_MEMORY_HOOK_DEDUP=0` disables this), and session
+  start shows real notes plus only the newest checkpoint.
+
 ### Changed
 
 - README rewritten with a feature overview, quickstart, hooks section, layout and a

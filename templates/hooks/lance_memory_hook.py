@@ -34,6 +34,7 @@ from pathlib import Path
 
 DEFAULT_URL = "http://127.0.0.1:8768"
 CATEGORY_CHECKPOINT = "session_handoff"
+CHECKPOINT_TAG = "auto-checkpoint"
 MAX_ITEM_CHARS = 300
 MAX_CONTEXT_CHARS = 4000
 PROJECT_LINE = re.compile(r"^\s*(?:[-*]\s*)?`?lance_memory_project_id`?\s*:\s*`?([A-Za-z0-9_.-]+)`?\s*$", re.M)
@@ -133,14 +134,42 @@ def format_context(project_id: str, rows: list) -> str:
     return context if len(context) <= MAX_CONTEXT_CHARS else context[: MAX_CONTEXT_CHARS - 3] + "..."
 
 
+def is_checkpoint(row: object) -> bool:
+    """True for notes written by this hook, so they can be thinned out and de-duplicated."""
+    if not isinstance(row, dict):
+        return False
+    tags = row.get("tags")
+    return (isinstance(tags, (list, tuple)) and CHECKPOINT_TAG in tags) or \
+        str(row.get("text") or "").startswith("Auto checkpoint at ")
+
+
+def select_notes(rows: list, limit: int) -> list:
+    """Newest-first notes for the session: real notes first-class, at most one checkpoint.
+
+    Without this, a busy project's most recent notes would all be auto-checkpoints."""
+    chosen, seen_checkpoint = [], False
+    for row in rows:
+        if not isinstance(row, dict) or not row.get("text") or row.get("error"):
+            continue
+        if is_checkpoint(row):
+            if seen_checkpoint:
+                continue
+            seen_checkpoint = True
+        chosen.append(row)
+        if len(chosen) >= limit:
+            break
+    return chosen
+
+
 def session_start(event: dict) -> int:
     project_id = find_project_id(event.get("cwd"))
     if not project_id:
         debug("no project: set LANCE_MEMORY_PROJECT_ID or add lance_memory_project_id to AGENTS.md")
         return 0
     limit = env_int("LANCE_MEMORY_HOOK_LIMIT", 8, 1, 25)
-    rows = call_tool("recall", {"project_id": project_id, "search_type": "recent", "limit": limit})
-    context = format_context(project_id, rows if isinstance(rows, list) else [])
+    # Over-fetch so thinning out checkpoints still leaves `limit` real notes.
+    rows = call_tool("recall", {"project_id": project_id, "search_type": "recent", "limit": min(25, limit * 3)})
+    context = format_context(project_id, select_notes(rows if isinstance(rows, list) else [], limit))
     print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": context}}))
     return 0
 
@@ -153,14 +182,15 @@ def git(cwd: str, *args: str) -> str | None:
         return None
 
 
-def checkpoint_text(event: dict) -> str:
-    """Deterministic checkpoint: no prompts, transcript content or absolute paths."""
+CHECKPOINT_HEAD = re.compile(r"^Auto checkpoint at .*?\)\.\s+")
+
+
+def checkpoint_state(event: dict) -> str:
+    """The part of a checkpoint that describes the workspace, without the time or event.
+
+    Two checkpoints with the same state record no new information."""
     cwd = event.get("cwd") or os.getcwd()
-    name = event.get("hook_event_name") or "checkpoint"
-    detail = event.get("reason") or event.get("trigger") or ""
-    now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    parts = [f"Auto checkpoint at {now} ({name}{': ' + clean(detail, 40) if detail else ''}).",
-             f"Workspace: {clean(Path(cwd).name, 80) or 'unknown'}."]
+    parts = [f"Workspace: {clean(Path(cwd).name, 80) or 'unknown'}."]
     branch, commit = git(cwd, "rev-parse", "--abbrev-ref", "HEAD"), git(cwd, "rev-parse", "--short", "HEAD")
     if branch and commit:
         parts.append(f"Git: {clean(branch, 80)} at {commit}.")
@@ -172,6 +202,14 @@ def checkpoint_text(event: dict) -> str:
     return " ".join(parts)
 
 
+def checkpoint_text(event: dict) -> str:
+    """Deterministic checkpoint: no prompts, transcript content or absolute paths."""
+    name = event.get("hook_event_name") or "checkpoint"
+    detail = event.get("reason") or event.get("trigger") or ""
+    now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    return f"Auto checkpoint at {now} ({name}{': ' + clean(detail, 40) if detail else ''}). " + checkpoint_state(event)
+
+
 def checkpoint(event: dict) -> int:
     if os.environ.get("LANCE_MEMORY_HOOK_WRITE", "1") == "0":
         debug("writes disabled (LANCE_MEMORY_HOOK_WRITE=0)")
@@ -180,10 +218,16 @@ def checkpoint(event: dict) -> int:
     if not project_id:
         debug("no project: set LANCE_MEMORY_PROJECT_ID or add lance_memory_project_id to AGENTS.md")
         return 0
+    if os.environ.get("LANCE_MEMORY_HOOK_DEDUP", "1") != "0":
+        recent = call_tool("recall", {"project_id": project_id, "search_type": "recent", "limit": 10})
+        latest = next((r for r in recent if is_checkpoint(r)), None) if isinstance(recent, list) else None
+        if latest and CHECKPOINT_HEAD.sub("", str(latest.get("text") or "")) == checkpoint_state(event):
+            debug("workspace unchanged since the last checkpoint; not writing another")
+            return 0
     call_tool("commit_memory", {
         "project_id": project_id, "text": checkpoint_text(event), "type": "discovery",
         "metadata": {"category": CATEGORY_CHECKPOINT, "verified": False, "bucket": "state",
-                     "tags": ["auto-checkpoint"]}})
+                     "tags": [CHECKPOINT_TAG]}})
     return 0
 
 
