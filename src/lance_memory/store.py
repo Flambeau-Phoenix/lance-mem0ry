@@ -140,8 +140,9 @@ class LanceStore:
         if not clauses:
             raise ValueError("delete_by_scope requires at least one scope filter")
         where = " AND ".join([*clauses, "immutable IS NOT TRUE"])
-        count = len(self.memories.search().where(where).limit(10_000).to_list())
-        self.memories.delete(where)
+        count = self.memories.count_rows(where)
+        if count:
+            self.memories.delete(where)
         return count
 
     def upsert_entity(self, name: str, vector: list[float], memory_id: str, scope_key: str):

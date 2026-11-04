@@ -4,7 +4,7 @@ Thanks for helping. By taking part you agree to the [code of conduct](CODE_OF_CO
 
 ## Set up
 
-Python 3.10+ is required.
+Python 3.11+ is required (the standard-library hook script alone runs on 3.10+).
 
 ```bash
 git clone https://github.com/Flambeau-Phoenix/lance-mem0ry.git
@@ -16,8 +16,8 @@ pip install -e ".[dev]"
 ## Checks
 
 ```bash
-pytest                        # full suite
-pytest tests/test_hooks.py    # hook tests only; no LanceDB or Ollama needed
+python -m pytest                       # full suite; run from the repository root
+python -m pytest tests/test_hooks.py   # hook tests only; no LanceDB or Ollama needed
 ruff check path/to/changed_file.py   # existing code has known findings; keep touched files clean
 ```
 

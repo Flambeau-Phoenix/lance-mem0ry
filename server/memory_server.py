@@ -23,6 +23,7 @@ from typing import Any, Iterable, Optional
 
 import lancedb
 import requests
+from lancedb.index import FTS
 from lancedb.pydantic import LanceModel, Vector
 from pydantic import Field
 
@@ -187,8 +188,8 @@ def load_project_categories(project: str) -> dict[str, dict[str, Any]]:
         try:
             with open(cat_file, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Warning: unreadable categories file {cat_file}: {e}; using defaults", file=sys.stderr)
     defaults = {
         "key_facts": {"description": "Ratified facts, verified patterns, stable APIs, and configuration constants.", "bucket": "fact"},
         "architectural_decisions": {"description": "System architecture, design choices, invariants, patterns, and architectural trade-offs.", "bucket": "decision"},
@@ -296,12 +297,7 @@ _tables: dict[str, Any] = {}
 def _ensure_fts(table: Any) -> None:
     for field in ("text", "symbol"):
         try:
-            table.create_fts_index(field, replace=True)
-        except TypeError:
-            try:
-                table.create_fts_index(field)
-            except Exception as e:
-                print(f"Warning: FTS index ({field}): {e}", file=sys.stderr)
+            table.create_index(field, config=FTS(), replace=True)
         except Exception as e:
             print(f"Warning: FTS index ({field}): {e}", file=sys.stderr)
 
@@ -315,12 +311,6 @@ def get_table(project: Optional[str] = None):
     db = lancedb.connect(str(path))
     listed = db.list_tables()
     names = set(listed.tables if hasattr(listed, "tables") else listed)
-    # Fall back for older LanceDB builds that still expose table_names().
-    if not names:
-        try:
-            names = set(db.table_names())
-        except Exception:
-            names = set()
     if TABLE_NAME not in names:
         table = db.create_table(TABLE_NAME, schema=ArchitecturalMemory)
         _ensure_fts(table)
@@ -1601,7 +1591,7 @@ def build_mcp():
             table = get_table(proj)
             active_rows = table.search().where("status = 'active'").limit(1000).to_list()
             duplicates = []
-            threshold = float((filters or {}).get("threshold", 0.03) if "filters" in locals() else 0.03)
+            threshold = 0.03
             import numpy as np
             for i in range(len(active_rows)):
                 v_i = active_rows[i].get("vector")
@@ -1680,6 +1670,11 @@ def cli_test_search(query: str, project: Optional[str] = None) -> None:
         print(f"  {i}. [{h.get('symbol')}] {t}")
 
 
+# Loopback by default; set LANCE_MEMORY_HOST=0.0.0.0 (or a LAN address) to expose it.
+DEFAULT_BIND_HOST = "127.0.0.1"
+LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+
 def main(argv: Optional[list[str]] = None) -> None:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] in ("test-add", "test-search"):
@@ -1706,14 +1701,20 @@ def main(argv: Optional[list[str]] = None) -> None:
     ).strip().lower() or "http"
     host = os.environ.get(
         "LANCE_MEMORY_HOST",
-        os.environ.get("ARCH_MEMORY_HOST", "0.0.0.0")
-    ).strip() or "0.0.0.0"
+        os.environ.get("ARCH_MEMORY_HOST", DEFAULT_BIND_HOST)
+    ).strip() or DEFAULT_BIND_HOST
     port = int(
         os.environ.get("LANCE_MEMORY_PORT", os.environ.get("ARCH_MEMORY_PORT", "8768"))
         or "8768"
     )
     if not hasattr(mcp, "run"):
         raise RuntimeError("FastMCP instance has no run()")
+    if transport != "stdio" and host not in LOOPBACK_HOSTS:
+        print(
+            f"Warning: listening on {host}. This server has no built-in authentication; "
+            "only expose it on a trusted network or behind your own access controls.",
+            file=sys.stderr,
+        )
     if transport == "stdio":
         print("Starting lance-memory stdio (explicit project selection required)", file=sys.stderr)
         mcp.run(transport="stdio")

@@ -254,3 +254,25 @@ def maintenance_apply(req: MaintenanceApplyRequest,
 def budget(authorization: str | None = Header(None)):
     _check_auth(authorization)
     return _memory.write_harness.tracker.snapshot()
+
+
+def main() -> None:
+    """Serve the REST API (`lance-memory-api`). Loopback by default; it has no auth unless
+    LANCE_MEMORY_TOKEN is set, so only widen LANCE_MEMORY_API_HOST on a trusted network."""
+    import sys
+
+    import uvicorn
+
+    host = os.environ.get("LANCE_MEMORY_API_HOST", "127.0.0.1").strip() or "127.0.0.1"
+    port = int(os.environ.get("LANCE_MEMORY_API_PORT", "8769") or "8769")
+    if host not in ("127.0.0.1", "localhost", "::1") and not AUTH_TOKEN:
+        print(
+            f"Warning: listening on {host} without LANCE_MEMORY_TOKEN set; "
+            "any client that can reach this port can read and change memories.",
+            file=sys.stderr,
+        )
+    uvicorn.run(app, host=host, port=port)
+
+
+if __name__ == "__main__":
+    main()

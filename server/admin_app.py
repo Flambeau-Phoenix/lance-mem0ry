@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import shutil
@@ -10,7 +11,6 @@ import subprocess
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -21,12 +21,10 @@ import streamlit as st
 from admin_cli import BACKUP_ROOT, audit_project, backup_project
 from memory_server import (
     ArchitecturalMemory,
-    EMBED_DIM,
     EMBED_MODEL,
     KNOWN_PROJECTS,
     OLLAMA_HOST,
     TABLE_NAME,
-    VALID_ENTITY_TYPES,
     _iso_now,
     embed_text,
     get_table,
@@ -38,6 +36,8 @@ from memory_server import (
 )
 
 SSE_URL = os.environ.get("LANCE_MEMORY_SSE_URL", os.environ.get("ARCH_MEMORY_SSE_URL", ""))
+log = logging.getLogger("admin_app")
+
 HTTP_URL = os.environ.get("LANCE_MEMORY_HTTP_URL", os.environ.get("ARCH_MEMORY_HTTP_URL", "http://127.0.0.1:8768/mcp"))
 SERVICE_UNITS = (
     "memory-portal-http.service",
@@ -134,7 +134,7 @@ def extraction_llm_status() -> tuple[bool, str]:
             models = response.json().get("data", [])
             return True, f"online ({len(models)} models)"
         return False, f"HTTP {response.status_code}"
-    except Exception as exc:
+    except Exception:
         return False, "offline"
 
 
@@ -171,7 +171,8 @@ def get_project_records(project: str, limit: int = 5000) -> pd.DataFrame:
         if "created_at" in df.columns:
             df = df.sort_values("created_at", ascending=False)
         return df.head(limit)
-    except Exception as e:
+    except Exception:
+        log.warning("Could not load recent records", exc_info=True)
         return pd.DataFrame()
 
 
@@ -194,7 +195,7 @@ def add_record(project: str, text: str, category: str, symbol: str, entity_type:
     try:
         rebuild_fts(table)
     except Exception:
-        pass
+        log.warning("FTS rebuild failed", exc_info=True)
     return record_id
 
 
@@ -206,7 +207,7 @@ def delete_record(project: str, record_id: str) -> int:
     try:
         rebuild_fts(table)
     except Exception:
-        pass
+        log.warning("FTS rebuild failed", exc_info=True)
     return int(getattr(result, "num_deleted_rows", 1))
 
 
@@ -221,7 +222,7 @@ def delete_by_category(project: str, category: str) -> int:
     try:
         rebuild_fts(table)
     except Exception:
-        pass
+        log.warning("FTS rebuild failed", exc_info=True)
     return int(getattr(result, "num_deleted_rows", 1))
 
 
@@ -237,7 +238,7 @@ def rename_category(project: str, old_cat: str, new_cat: str) -> int:
     try:
         rebuild_fts(table)
     except Exception:
-        pass
+        log.warning("FTS rebuild failed", exc_info=True)
     return int(getattr(result, "rows_updated", 1))
 
 
@@ -250,7 +251,7 @@ def purge_project(project: str) -> bool:
     try:
         db.drop_table(TABLE_NAME)
     except Exception:
-        pass
+        log.debug("drop_table(%s) skipped (table may not exist)", TABLE_NAME, exc_info=True)
     table = db.create_table(TABLE_NAME, schema=ArchitecturalMemory)
     rebuild_fts(table)
     invalidate_table(project)
@@ -286,7 +287,7 @@ def load_project_categories(project: str) -> dict[str, dict[str, Any]]:
             with open(path, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception:
-            pass
+            log.warning("Unreadable categories file %s; using defaults", path, exc_info=True)
     defaults = {
         "key_facts": {
             "description": "Ratified facts, verified patterns, stable APIs, and configuration constants.",

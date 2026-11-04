@@ -3,7 +3,7 @@ name = "lance-memory"
 version = "1.1.0"
 description = "Mem0-inspired persistent memory for AI agents, backed by LanceDB."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
 authors = [{ name = "LanceMemory Contributors" }]
 keywords = ["mcp", "memory", "ai-agents", "lancedb", "ollama", "claude-code", "fastmcp"]
@@ -13,14 +13,15 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Libraries",
 ]
 
 dependencies = [
-    "lancedb>=0.13.0",
+    "lancedb>=0.38.0",
     "pyarrow>=15.0.0",
     "openai>=1.40.0",
     "pydantic>=2.6.0",
@@ -48,7 +49,7 @@ Changelog = "https://github.com/Flambeau-Phoenix/lance-mem0ry/blob/master/CHANGE
 [project.scripts]
 lance-memory-mcp = "lance_memory.mcp_server:main"
 lance-memory     = "lance_memory.cli:main"
-lance-memory-api = "lance_memory.api:app"
+lance-memory-api = "lance_memory.api:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -75,4 +76,4 @@ include = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"

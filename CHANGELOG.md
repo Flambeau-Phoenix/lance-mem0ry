@@ -21,6 +21,17 @@ Earlier history is in the Git log. Versions follow `pyproject.toml`.
 
 ### Changed
 
+- The MCP server (`server/memory_server.py`) now binds to `127.0.0.1` by default instead
+  of `0.0.0.0`, and prints a warning when `LANCE_MEMORY_HOST` is set to a non-loopback
+  address. The systemd units, `.env.example`, runbook and security notes follow suit.
+  Set `LANCE_MEMORY_HOST=0.0.0.0` (or a LAN address) to keep the old behavior.
+- Supported Python is now 3.11 or newer, matching what the dependency tree and CI
+  actually exercise (3.11, 3.12, 3.13 and 3.14). The hook script still runs on 3.10+.
+  `lancedb` is now required at `>=0.38.0`, the first release verified to have the
+  non-deprecated APIs below.
+- README rewritten again: accurate transport default (`http`, not `stdio`), the
+  network-exposure model, the REST API, immutable memories, the web panel and a layout
+  that matches the repository.
 - README rewritten with a feature overview, quickstart, hooks section, layout and a
   development guide, including a note that the services have no built-in
   authentication.
@@ -42,6 +53,17 @@ Earlier history is in the Git log. Versions follow `pyproject.toml`.
   the table, bypassing the project check and immutable protection. Server admin
   category filters and the record-listing filters (`status`, `bucket`, `category`)
   in `server/memory_server.py` are escaped the same way.
+- `lance-memory-api` crashed on start because the entry point referenced the ASGI app
+  object instead of a function. It now runs `lance_memory.api:main`, which serves the
+  REST API with uvicorn on `127.0.0.1:8769` (`LANCE_MEMORY_API_HOST`,
+  `LANCE_MEMORY_API_PORT`) and warns if exposed without `LANCE_MEMORY_TOKEN`.
+- Deprecated LanceDB calls removed: full-text indexes use `create_index(config=FTS())`
+  and the `table_names()` fallback is gone.
+- `delete_by_scope` counted at most 10,000 matching rows while deleting all of them, so
+  large deletes under-reported. It now uses an exact count.
+- Silent `except: pass` blocks in the admin console and category loader now log a
+  warning; unused imports and variables were removed, and the dead
+  `"filters" in locals()` guard in the duplicate scan became a plain default.
 - `server/init_project_memories.py` no longer seeds a `default` partition when
   `PROJECT_MEMORY_PROJECTS` is unset, matching the documented blank-slate install.
 - `lance_memory.mcp_server` (the `lance-memory-mcp` entry point) imports on a fresh

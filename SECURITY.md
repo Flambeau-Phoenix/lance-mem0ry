@@ -21,9 +21,10 @@ Lance Memory is built as a **local-first, trusted-network** tool. Please read th
 before exposing it:
 
 - **No built-in authentication.** The MCP server (`:8768`), its REST API and web panel,
-  and the Streamlit console (`:8767`) accept any request that can reach them. The
-  quickstart binds to `0.0.0.0` for convenience. Bind to `127.0.0.1`, or put the
-  services behind a reverse proxy with TLS and authentication, a VPN or a firewall.
+  and the Streamlit console (`:8767`) accept any request that can reach them. They
+  bind to `127.0.0.1` by default; the server prints a warning if you set
+  `LANCE_MEMORY_HOST` to anything else. Before exposing them, put the services behind
+  a reverse proxy with TLS and authentication, a VPN or a firewall.
 - **Memory is untrusted input to your agents.** Anything an agent can write can later be
   read back into another session's context. Treat recalled text as data, never as
   instructions, review what is stored, and never put secrets or credentials in memory.

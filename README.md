@@ -7,26 +7,38 @@
 <p align="center"><img src="lancemem0.png" alt="LanceMem0ry" width="360"></p>
 
 <p align="center">
+  <a href="https://github.com/Flambeau-Phoenix/lance-mem0ry/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Flambeau-Phoenix/lance-mem0ry/actions/workflows/ci.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg"></a>
-  <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue.svg">
+  <img alt="Python 3.11 to 3.14" src="https://img.shields.io/badge/python-3.11%E2%80%933.14-blue.svg">
   <img alt="MCP server" src="https://img.shields.io/badge/MCP-server-8A2BE2.svg">
   <img alt="Local first: Ollama and LanceDB" src="https://img.shields.io/badge/local--first-Ollama%20%2B%20LanceDB-brightgreen.svg">
 </p>
 
 Lance Memory (`lance-mem0ry`) gives coding agents a durable memory that survives
-sessions. It is a Python library (`lance_memory`) plus a FastMCP server that exposes
-exactly **five** routed tools, an admin web panel, and ready-made Claude Code hooks.
-Embeddings run locally through Ollama, so no paid vector database or embedding API is
-required. The design is heavily inspired by [mem0](https://github.com/mem0ai/mem0),
-adapted for LanceDB.
+sessions. Embeddings are generated locally through Ollama, so no paid vector database or
+embedding API is required. The design is heavily inspired by
+[mem0](https://github.com/mem0ai/mem0), adapted for LanceDB.
+
+It ships as several pieces that share the same storage:
+
+| Piece | What it is | Start it with |
+|---|---|---|
+| **MCP server** | FastMCP server exposing exactly **five** routed tools; the main way agents use Lance Memory | `python server/memory_server.py` |
+| **Python library** | `lance_memory`: a Mem0-style `LanceMemory` API (add, search, update, delete, history) | `from lance_memory import LanceMemory` |
+| **REST API** | FastAPI wrapper around the library | `lance-memory-api` |
+| **Admin console** | Streamlit UI for categories, project provisioning, migration and maintenance | `streamlit run server/admin_app.py` |
+| **Web panel** | React and Vite UI (see [`web-panel/`](web-panel/README.md)) | `npm run dev` in `web-panel/` |
+| **Claude Code hooks** | Load recent memory at session start; checkpoint at compaction and session end | [`templates/hooks/`](templates/hooks/README.md) |
 
 **Contents:**
 [Features](#features) ·
 [Quickstart](#quickstart) ·
+[Network exposure](#network-exposure) ·
 [Claude Code hooks](#claude-code-hooks) ·
 [The five tools](#the-five-mcp-tools) ·
+[Immutable memories](#immutable-memories-library) ·
 [Categories](#category-governance--agent-lifecycle) ·
-[Web panel](#web-control-panel) ·
+[Admin console](#admin-console) ·
 [Configuration](#configuration-reference) ·
 [Layout](#repository-layout) ·
 [Development](#development) ·
@@ -42,7 +54,7 @@ adapted for LanceDB.
   `lance_memory_project_id` in the nearest `AGENTS.md` takes precedence, otherwise they
   choose the best contextual fit. Folder names need not match partition IDs. Agents are
   **forbidden from creating project IDs**; administrators provision partitions through
-  the web panel or CLI.
+  the admin console or CLI.
 - **Enforced category registry.** Every project keeps a `categories.json` catalog.
   Agents read the category descriptions via `inspect_memory_system(action="categories")`
   to decide where each memory belongs.
@@ -52,20 +64,20 @@ adapted for LanceDB.
 - **Five-tool MCP surface.** `recall`, `commit_memory`, `modify_memory`,
   `sync_session_buffer`, `inspect_memory_system`. No wall of 20+ tools; each routes
   internally by parameter.
-- **Admin web portal.** A Streamlit console (port `8767`) and a built-in FastMCP web
-  panel (port `8768`) for category management, cross-project migration, one-click
-  project provisioning, full-text search, duplicate detection and vector-safe export.
+- **Blank slate.** A fresh install contains no projects, memories or sample data.
 - **Claude Code hooks.** Load recent project memory at session start and checkpoint at
   compaction and session end. See [Claude Code hooks](#claude-code-hooks).
 
 ## Quickstart
 
-Requirements: Python 3.10+ and [Ollama](https://ollama.com).
+Requirements: Python 3.11 or newer and [Ollama](https://ollama.com). Python 3.11, 3.12,
+3.13 and 3.14 are tested in CI. The hook script alone only needs Python 3.10+.
 
 **1. Install**
 
 ```bash
-pip install -e ".[admin]"   # the [admin] extra adds Streamlit for the web console
+python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate
+pip install -e ".[admin]"                         # [admin] adds Streamlit for the console
 ```
 
 **2. Start local embeddings**
@@ -79,24 +91,33 @@ ollama serve
 
 ```bash
 export PROJECT_MEMORIES_ROOT=./project_memories
-export LANCE_MEMORY_TRANSPORT=http
-export LANCE_MEMORY_PORT=8768
-python server/memory_server.py
+python server/memory_server.py          # http://127.0.0.1:8768/mcp
 ```
 
-**4. Launch the web control panel**
+**4. Launch the admin console**
 
 ```bash
-streamlit run server/admin_app.py --server.port 8767 --server.address 0.0.0.0
+streamlit run server/admin_app.py --server.port 8767 --server.address 127.0.0.1
 ```
 
 Use **➕ Provision New Project** in the sidebar to create your first project partition.
-Then point your agent at the server by copying `templates/.mcp.json`, `templates/AGENTS.md`
-and `templates/skills/lance-memory-governance/` into your project.
+Then point your agent at the server by copying `templates/.mcp.json`,
+`templates/AGENTS.md` and `templates/skills/lance-memory-governance/` into your project.
 
-> The server and web panel have **no built-in authentication**. The quickstart binds
-> the Streamlit panel to `0.0.0.0` for convenience; on anything other than a trusted
-> network, bind to `127.0.0.1` or put both behind your own access controls.
+## Network exposure
+
+The server and consoles have **no built-in authentication**, so everything binds to
+`127.0.0.1` by default. Reaching them from another machine is an explicit opt-in:
+
+```bash
+export LANCE_MEMORY_HOST=0.0.0.0        # or a specific LAN address
+```
+
+The server prints a warning at startup when it listens on anything other than loopback.
+Only do this on a trusted network, or put the services behind a reverse proxy with TLS
+and authentication, a VPN or a firewall. The REST API (`lance-memory-api`, loopback on
+port `8769`) honours a bearer token: set `LANCE_MEMORY_TOKEN` before exposing it. See
+[SECURITY.md](SECURITY.md) for the full guidance.
 
 ## Claude Code hooks
 
@@ -131,10 +152,20 @@ inspect_memory_system(action="categories", project_id="<PROJECT_ID>")
 
 Full tool and schema reference: [docs/MEMORY_SYSTEM_REFERENCE.md](docs/MEMORY_SYSTEM_REFERENCE.md).
 
-In the Mem0-compatible Python library, `add(..., immutable=True)` protects a memory
-from updates, deletion, and automatic mutations. Direct `update()` and `delete()`
-raise `ValueError`; batch operations, `delete_all()`, and linked deletion cascades
-skip protected rows and report only the memories actually changed or deleted.
+The library also installs a separate MCP entry point, `lance-memory-mcp`, that exposes
+the Mem0-style API directly (about twenty fine-grained tools). The five-tool server above
+is the one the templates, hooks and documentation target.
+
+## Immutable memories (library)
+
+In the Python library, `add(..., immutable=True)` protects a memory from updates,
+deletion and automatic mutations such as supersession:
+
+- `update()` and `delete()` raise `ImmutableMemoryError` (a `ValueError` subclass).
+- `batch_update()`, `batch_delete()`, `delete_all()` and `delete(..., delete_linked=True)`
+  skip protected rows and report only what actually changed.
+- Over REST, `PATCH` and `DELETE` on an immutable memory return HTTP 404 with an
+  "immutable" detail.
 
 ## Category governance & agent lifecycle
 
@@ -150,10 +181,10 @@ agent-readable description.
 | `session_handoff` | `state` | `false` | Session summaries, milestones reached and next action items. |
 
 Administrators can add project-specific categories in `categories.json` or through the
-web panel. The agent charter and workflow (before, during, after proof, handoff) live in
-[`templates/AGENTS.md`](templates/AGENTS.md).
+admin console. The agent charter and workflow (before, during, after proof, handoff)
+live in [`templates/AGENTS.md`](templates/AGENTS.md).
 
-## Web control panel
+## Admin console
 
 The Streamlit console (`server/admin_app.py`, default port `8767`) provides:
 
@@ -162,13 +193,13 @@ The Streamlit console (`server/admin_app.py`, default port `8767`) provides:
    categories; and a cross-project **migrate or copy** tool that rebuilds full-text
    indexes and tags provenance.
 2. **Project provisioning.** One-click scaffolding of clean LanceDB partitions with
-   Tantivy full-text indexes and default category registries.
+   full-text indexes and default category registries.
 3. **Safe vector serialization.** A built-in `NumpyEncoder` handles 768-dimensional
    NumPy vectors without JSON crashes during export and inspection.
 4. **Maintenance and deduplication.** Pairwise cosine-distance scans (distance < 0.15).
 
-The server also hosts a lighter built-in panel and REST API on `:8768`. Backend and API
-details: [docs/WEB_PORTAL_BACKEND_REQUIREMENTS.md](docs/WEB_PORTAL_BACKEND_REQUIREMENTS.md).
+The MCP server also hosts a lighter built-in panel and REST routes on `:8768`. Backend
+and API details: [docs/WEB_PORTAL_BACKEND_REQUIREMENTS.md](docs/WEB_PORTAL_BACKEND_REQUIREMENTS.md).
 Operations, backup and maintenance: [docs/RUNBOOK.md](docs/RUNBOOK.md).
 
 ## Configuration reference
@@ -178,9 +209,12 @@ Operations, backup and maintenance: [docs/RUNBOOK.md](docs/RUNBOOK.md).
 | `PROJECT_MEMORIES_ROOT` | `./project_memories` | Root directory containing project partition folders |
 | `PROJECT_MEMORY_PROJECTS` | discovered directories | Optional comma-separated authorized or pre-seeded partitions; omit for a blank slate |
 | `OLLAMA_HOST` | `http://127.0.0.1:11434` | Ollama embedding endpoint |
-| `LANCE_MEMORY_TRANSPORT` | `stdio` | FastMCP transport (`http`, `sse` or `stdio`) |
-| `LANCE_MEMORY_PORT` | `8768` | FastMCP HTTP daemon port |
-| `LANCE_MEMORY_HOST` | `0.0.0.0` | FastMCP bind host (`ARCH_MEMORY_HOST` is a deprecated fallback) |
+| `LANCE_MEMORY_TRANSPORT` | `http` | FastMCP transport (`http`, `sse` or `stdio`) |
+| `LANCE_MEMORY_HOST` | `127.0.0.1` | MCP server bind host; widen only on a trusted network (`ARCH_MEMORY_HOST` is a deprecated fallback) |
+| `LANCE_MEMORY_PORT` | `8768` | MCP server HTTP port |
+| `LANCE_MEMORY_API_HOST` | `127.0.0.1` | REST API (`lance-memory-api`) bind host |
+| `LANCE_MEMORY_API_PORT` | `8769` | REST API port |
+| `LANCE_MEMORY_TOKEN` | none | Bearer token the REST API requires when set |
 | `EXTRACTION_LLM_URL` | none | Optional OpenAI-compatible endpoint for memory extraction |
 | `LANCE_MEMORY_LLM_PROVIDER` | `ollama` | LLM provider (`openai_compatible` for HTTP proxies; legacy `butter` still accepted) |
 
@@ -207,18 +241,21 @@ lance-mem0ry/
 ├── examples/                  Example LanceDB partition, tarball and JSON export (synthetic vectors)
 ├── server/
 │   ├── memory_server.py       FastMCP server (recall, commit, inspect, ...)
-│   ├── admin_app.py           Streamlit web control panel
+│   ├── admin_app.py           Streamlit admin console
 │   ├── admin_cli.py           Backup, audit and maintenance CLI
 │   ├── static/index.html      Built-in lightweight web panel
 │   └── scripts/               Smoke test, nightly maintenance, migrations
-├── src/lance_memory/          Core library (LanceMemory, SessionMemory, retrieval, store)
-├── systemd/                   Example service and timer units
+├── src/lance_memory/          Core library, REST API and `lance-memory-mcp` entry point
+├── systemd/                   Example service and timer units (loopback by default)
 ├── templates/                 Drop into any project repository:
 │   ├── .mcp.json              MCP endpoint configuration
 │   ├── AGENTS.md              Agent governance charter
 │   ├── skills/                Agent skill definition (lance-memory-governance)
 │   └── hooks/                 Claude Code hooks (session-start recall, checkpoints)
+├── web-panel/                 React and Vite admin UI with an Express dev server
 ├── tests/                     Pytest suite
+├── .github/                   CI workflows, issue and pull-request templates, Dependabot
+├── .env.example               Annotated environment template
 └── pyproject.toml
 ```
 
@@ -226,13 +263,22 @@ lance-mem0ry/
 
 ```bash
 pip install -e ".[dev]"
-pytest                       # full suite
-pytest tests/test_hooks.py   # hook tests only; no LanceDB or Ollama needed
+python -m pytest                       # full suite; run from the repository root
+python -m pytest tests/test_hooks.py   # hook tests only; no LanceDB or Ollama needed
 ruff check path/to/changed_file.py
 ```
 
-`ruff` is configured in `pyproject.toml`; the existing code has known findings, so
-please keep the files you touch clean rather than expecting a clean repository-wide run.
+The web panel has its own checks:
+
+```bash
+cd web-panel && npm ci && npm run lint && npm run build
+```
+
+CI (`.github/workflows/ci.yml`) runs the full Python suite on Python 3.11 to 3.14 and the
+web-panel type-check and build; a separate workflow runs the hook tests on Python 3.10
+and newer. `ruff` is configured in `pyproject.toml`; the existing code has known
+findings, so please keep the files you touch clean rather than expecting a clean
+repository-wide run.
 
 Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md) and the
 [code of conduct](CODE_OF_CONDUCT.md). Report security issues privately as described in

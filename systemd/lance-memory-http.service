@@ -12,7 +12,9 @@ RestartSec=5
 Environment=PROJECT_MEMORIES_ROOT=/opt/lance-memory/project_memories
 Environment=OLLAMA_HOST=http://127.0.0.1:11434
 Environment=LANCE_MEMORY_TRANSPORT=http
-Environment=LANCE_MEMORY_HOST=0.0.0.0
+# Loopback by default. There is no built-in authentication: change to 0.0.0.0 or a LAN
+# address only on a trusted network or behind a reverse proxy.
+Environment=LANCE_MEMORY_HOST=127.0.0.1
 Environment=LANCE_MEMORY_PORT=8768
 Environment=FASTMCP_STATELESS_HTTP=true
 

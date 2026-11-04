@@ -195,12 +195,13 @@ def generate() -> None:
     lance_built = False
     try:
         import lancedb  # type: ignore
+        from lancedb.index import FTS
 
         db = lancedb.connect(str(out_dir))
         table = db.create_table("records", data=rows, mode="overwrite")
         for col in ("text", "symbol"):
             try:
-                table.create_fts_index(col, replace=True)
+                table.create_index(col, config=FTS(), replace=True)
             except Exception as fts_err:
                 print(f"FTS index for {col} skipped: {fts_err}")
         lance_built = True
