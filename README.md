@@ -30,6 +30,11 @@ It ships as several pieces that share the same storage:
 | **Web panel** | React and Vite UI (see [`web-panel/`](web-panel/README.md)) | `npm run dev` in `web-panel/` |
 | **Claude Code hooks** | Load recent memory at session start; checkpoint at compaction and session end | [`templates/hooks/`](templates/hooks/README.md) |
 
+<p align="center">
+  <img src="docs/images/web-panel-home.png" alt="The Lance Memory web panel on a fresh install: overview page with an empty project picker" width="900"><br>
+  <em>The web panel on a fresh install: no projects, memories or sample data.</em>
+</p>
+
 **Contents:**
 [Features](#features) ·
 [Quickstart](#quickstart) ·
@@ -215,6 +220,7 @@ Operations, backup and maintenance: [docs/RUNBOOK.md](docs/RUNBOOK.md).
 | `LANCE_MEMORY_API_HOST` | `127.0.0.1` | REST API (`lance-memory-api`) bind host |
 | `LANCE_MEMORY_API_PORT` | `8769` | REST API port |
 | `LANCE_MEMORY_TOKEN` | none | Bearer token the REST API requires when set |
+| `HOST` / `PORT` | `127.0.0.1` / `3000` | Web panel (`web-panel/`) bind address and port |
 | `EXTRACTION_LLM_URL` | none | Optional OpenAI-compatible endpoint for memory extraction |
 | `LANCE_MEMORY_LLM_PROVIDER` | `ollama` | LLM provider (`openai_compatible` for HTTP proxies; legacy `butter` still accepted) |
 

@@ -109,7 +109,9 @@ function compute2DProjection(items: LanceMemoryRecord[]): ClusterPoint[] {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
+  // Loopback by default: the panel has no authentication. Set HOST=0.0.0.0 to expose it.
+  const HOST = process.env.HOST || '127.0.0.1';
 
   app.use(express.json({ limit: '15mb' }));
   app.use(express.urlencoded({ extended: true }));
@@ -1784,8 +1786,8 @@ Return only the suggested description text.`;
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Lance Memory Web Panel running on http://0.0.0.0:${PORT}`);
+  app.listen(PORT, HOST, () => {
+    console.log(`Lance Memory Web Panel running on http://${HOST}:${PORT}`);
   });
 }
 

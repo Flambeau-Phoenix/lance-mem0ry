@@ -6,6 +6,8 @@ Earlier history is in the Git log. Versions follow `pyproject.toml`.
 
 ### Added
 
+- Web panel screenshot (`docs/images/web-panel-home.png`) on the README front page and in
+  `web-panel/README.md`.
 - **Claude Code hooks** (`templates/hooks/`): load recent project memory at
   `SessionStart` and write a small unverified checkpoint at `PreCompact` and
   `SessionEnd`. Standard library only, fail-soft, read-only mode, project ID from
@@ -25,6 +27,8 @@ Earlier history is in the Git log. Versions follow `pyproject.toml`.
   of `0.0.0.0`, and prints a warning when `LANCE_MEMORY_HOST` is set to a non-loopback
   address. The systemd units, `.env.example`, runbook and security notes follow suit.
   Set `LANCE_MEMORY_HOST=0.0.0.0` (or a LAN address) to keep the old behavior.
+- The web panel's Express server (`web-panel/server.ts`) now listens on `127.0.0.1` by
+  default and honours `HOST` and `PORT`; it previously listened on `0.0.0.0:3000`.
 - Supported Python is now 3.11 or newer, matching what the dependency tree and CI
   actually exercise (3.11, 3.12, 3.13 and 3.14). The hook script still runs on 3.10+.
   `lancedb` is now required at `>=0.38.0`, the first release verified to have the
