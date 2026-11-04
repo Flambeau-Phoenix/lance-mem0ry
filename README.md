@@ -4,6 +4,8 @@
   <strong>Persistent, project-scoped memory for AI agents. Local-first, backed by LanceDB, with five tools.</strong>
 </p>
 
+<p align="center"><img src="lancememory.png" alt="SimpleLFG" width="360"></p>
+
 <p align="center">
   <a href="LICENSE"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg"></a>
   <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue.svg">
