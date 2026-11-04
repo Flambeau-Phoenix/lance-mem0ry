@@ -15,10 +15,11 @@ import { FastMCPInfoPage } from './components/FastMCPInfoPage';
 import { RulesDirectivesView } from './components/RulesDirectivesView';
 import { MaintenanceLab } from './components/MaintenanceLab';
 import {
-  fetchProjects,
-  fetchTelemetry,
-  fetchAudit,
-  fetchMemories,
+  fetchProjects as apiFetchProjects,
+  fetchTelemetry as apiFetchTelemetry,
+  fetchAudit as apiFetchAudit,
+  fetchMemories as apiFetchMemories,
+  simulateMissingRequirement,
   createMemory,
   updateMemory,
   deleteMemory,
@@ -71,7 +72,7 @@ export default function App() {
   // 1. Fetch Projects & Telemetry with auto-retry and safe fallback
   const fetchProjects = useCallback(async () => {
     try {
-      const data = await fetchProjects();
+      const data = await apiFetchProjects();
       if (data && Array.isArray(data) && data.length > 0) {
         setProjects(data);
 
@@ -89,7 +90,7 @@ export default function App() {
 
   const fetchTelemetry = useCallback(async () => {
     try {
-      const data = await fetchTelemetry();
+      const data = await apiFetchTelemetry();
       if (data && data.metrics) {
         setMetrics(data.metrics);
       }
@@ -101,7 +102,7 @@ export default function App() {
   // 2. Fetch Audit Report
   const fetchAudit = useCallback(async () => {
     try {
-      const data = await fetchAudit();
+      const data = await apiFetchAudit();
       if (data) {
         setAuditReport(data);
         return;
@@ -118,7 +119,7 @@ export default function App() {
   // 3. Fetch Memories for Active Project
   const fetchMemories = useCallback(async (projectId: string) => {
     try {
-      const data = await fetchMemories(projectId);
+      const data = await apiFetchMemories(projectId);
       const records: LanceMemoryRecord[] = data?.records ?? [];
       if (records.length > 0 || data) {
         setMemories(records);
@@ -215,7 +216,14 @@ export default function App() {
         const updated = await updateMemory(activeProject.id, editingMemory.record_id, memoryData);
         setMemories(prev => prev.map(m => (m.record_id === updated.record_id ? updated : m)));
       } else {
-        const created = await createMemory(activeProject.id, memoryData);
+        if (!memoryData.text || !memoryData.category) {
+          throw new Error('Memory text and category are required');
+        }
+        const created = await createMemory(activeProject.id, {
+          ...memoryData,
+          text: memoryData.text,
+          category: memoryData.category,
+        });
         setMemories(prev => [created, ...prev]);
       }
       setIsMemoryModalOpen(false);

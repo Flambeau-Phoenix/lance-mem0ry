@@ -83,7 +83,7 @@ export interface TelemetryMetrics {
   p95_latency_ms: number;
   total_queries_24h: number;
   ollama_status: 'online' | 'standby' | 'offline';
-  lancedb_status: 'online' | 'indexing';
+  lancedb_status: 'online' | 'indexing' | 'offline';
   mcp_status: 'connected' | 'idle';
   dim_size: number;
   vector_cache_hit_rate: number;
@@ -202,7 +202,7 @@ export interface MCPServerStatus {
   server_name: string;
   version: string;
   protocol_version: string;
-  status: 'online' | 'standby' | 'error';
+  status: 'online' | 'standby' | 'error' | 'offline';
   transport: string;
   uptime_seconds: number;
   endpoint: string;

@@ -183,6 +183,8 @@ def test_web_panel_routes(tmp_path, monkeypatch):
     (tmp_path / 'WebTest').mkdir()
 
     mcp = ms.build_mcp()
+    if not hasattr(mcp, "http_app"):
+        pytest.skip("standalone fastmcp is unavailable or incompatible with the installed mcp")
     client = TestClient(mcp.http_app())
 
     # 1. Panel page

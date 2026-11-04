@@ -1,8 +1,8 @@
 ﻿"""Scaffold empty project LanceDB partitions under PROJECT_MEMORIES_ROOT.
 
-Creates the projects listed in PROJECT_MEMORY_PROJECTS (comma-separated), or a
-single "default" partition if none are configured. Future projects can still
-be created on first write without being pre-listed here.
+Creates the projects listed in PROJECT_MEMORY_PROJECTS (comma-separated). With
+none configured it creates nothing: the install is a blank slate and partitions
+are created on first write.
 """
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from memory_server import (  # noqa: E402
 
 import lancedb
 
-DEFAULT_SEED_PROJECTS = ("default",)
+DEFAULT_SEED_PROJECTS: tuple[str, ...] = ()
 
 
 def seed_project_names() -> list[str]:
@@ -53,11 +53,13 @@ def create_blank_db(project: str) -> Path:
 
 
 def main() -> None:
-    os.environ.setdefault("PROJECT_MEMORY", DEFAULT_SEED_PROJECTS[0])
     root = memories_root()
     root.mkdir(parents=True, exist_ok=True)
     print(f"PROJECT_MEMORIES_ROOT={root}")
-    for name in seed_project_names():
+    names = seed_project_names()
+    if not names:
+        print("PROJECT_MEMORY_PROJECTS is not set; nothing to scaffold (blank slate).")
+    for name in names:
         print(f"  scaffolding {name}")
         create_blank_db(name)
     print("Done.")

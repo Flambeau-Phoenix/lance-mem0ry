@@ -3,11 +3,14 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
-
 from .memory import LanceMemory
 from .session import SessionMemory
 from .harness import MaintenanceHarness
+
+try:  # standalone fastmcp works with mcp 2.x, where mcp.server.fastmcp was removed
+    from fastmcp import FastMCP
+except ImportError:
+    from mcp.server.fastmcp import FastMCP
 
 
 mcp = FastMCP("lance-memory")

@@ -8,6 +8,7 @@ from typing import Any, Iterable
 import lancedb
 import pyarrow as pa
 
+from .filters import scope_clauses, sql_str
 from .schema import (
     get_memory_schema,
     get_entity_schema,
@@ -100,7 +101,7 @@ class LanceStore:
         return ids
 
     def get_memory(self, memory_id: str) -> dict | None:
-        tbl = self.memories.search().where(f"id = '{memory_id}'").limit(1).to_list()
+        tbl = self.memories.search().where(f"id = {sql_str(memory_id)}").limit(1).to_list()
         return tbl[0] if tbl else None
 
     def update_memory(self, memory_id: str, updates: dict) -> bool:
@@ -119,7 +120,7 @@ class LanceStore:
                 payload["categories"] = v
             else:
                 payload[k] = v
-        self.memories.update(where=f"id = '{memory_id}'", values=payload)
+        self.memories.update(where=f"id = {sql_str(memory_id)}", values=payload)
         return True
 
     def mark_superseded(self, old_id: str, new_id: str):
@@ -131,11 +132,11 @@ class LanceStore:
             return False
         if existing.get("immutable"):
             raise ImmutableMemoryError(f"Memory {memory_id} is immutable")
-        self.memories.delete(f"id = '{memory_id}'")
+        self.memories.delete(f"id = {sql_str(memory_id)}")
         return True
 
     def delete_by_scope(self, **scopes) -> int:
-        clauses = [f"{k} = '{v}'" for k, v in scopes.items() if v is not None]
+        clauses = scope_clauses(scopes)
         if not clauses:
             raise ValueError("delete_by_scope requires at least one scope filter")
         where = " AND ".join([*clauses, "immutable IS NOT TRUE"])
@@ -145,7 +146,7 @@ class LanceStore:
 
     def upsert_entity(self, name: str, vector: list[float], memory_id: str, scope_key: str):
         hits = self.entities.search().where(
-            f"name = '{name}' AND scope_key = '{scope_key}'"
+            f"name = {sql_str(name)} AND scope_key = {sql_str(scope_key)}"
         ).limit(1).to_list()
         now = _utcnow()
         if hits:
@@ -154,7 +155,7 @@ class LanceStore:
             if memory_id not in ids:
                 ids.append(memory_id)
             self.entities.update(
-                where=f"id = '{row['id']}'",
+                where=f"id = {sql_str(row['id'])}",
                 values={"memory_ids": ids, "updated_at": now},
             )
         else:
@@ -171,10 +172,10 @@ class LanceStore:
     def find_entities(self, names: list[str], scope_key: str) -> list[dict]:
         if not names:
             return []
-        quoted = ", ".join(f"'{n}'" for n in names)
+        quoted = ", ".join(sql_str(n) for n in names)
         return (
             self.entities.search()
-            .where(f"name IN ({quoted}) AND scope_key = '{scope_key}'")
+            .where(f"name IN ({quoted}) AND scope_key = {sql_str(scope_key)}")
             .limit(500)
             .to_list()
         )
@@ -208,7 +209,7 @@ class LanceStore:
     def get_history(self, memory_id: str, project_id: str) -> list[dict]:
         rows = (
             self.history.search()
-            .where(f"memory_id = '{memory_id}' AND project_id = '{project_id}'")
+            .where(f"memory_id = {sql_str(memory_id)} AND project_id = {sql_str(project_id)}")
             .limit(1000)
             .to_list()
         )
@@ -230,7 +231,7 @@ class LanceStore:
     def recent_conversation(self, scope_key: str, limit: int = 20) -> list[dict]:
         rows = (
             self.conversations.search()
-            .where(f"scope_key = '{scope_key}'")
+            .where(f"scope_key = {sql_str(scope_key)}")
             .limit(limit * 4)
             .to_list()
         )

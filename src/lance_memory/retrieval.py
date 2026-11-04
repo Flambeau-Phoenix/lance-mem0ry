@@ -2,6 +2,7 @@
 from __future__ import annotations
 from typing import Any
 
+from .filters import sql_str
 from .store import LanceStore
 
 
@@ -37,7 +38,7 @@ def entity_search(store: LanceStore, entity_names: list[str], scope: str, limit:
         memory_ids.update(e.get("memory_ids") or [])
     if not memory_ids:
         return []
-    quoted = ", ".join(f"'{mid}'" for mid in memory_ids)
+    quoted = ", ".join(sql_str(mid) for mid in memory_ids)
     rows = store.memories.search().where(f"id IN ({quoted})").limit(limit).to_list()
     for r in rows:
         r["_signal"] = "entity"

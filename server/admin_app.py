@@ -151,6 +151,10 @@ def journal(minutes: int = 15, lines: int = 150) -> str:
         return str(exc)
 
 
+def _sql_quote(value: str) -> str:
+    return "'" + str(value).replace("'", "''") + "'"
+
+
 def safe_id(value: str) -> str:
     try:
         return str(uuid.UUID(str(value)))
@@ -317,7 +321,7 @@ def migrate_or_copy_category(source_proj: str, target_proj: str, category_name: 
     src_table = get_table(source_proj)
     target_table = get_table(target_proj)
 
-    src_records = src_table.search().where(f"category = '{category_name}'").limit(50_000).to_arrow().to_pylist()
+    src_records = src_table.search().where(f"category = {_sql_quote(category_name)}").limit(50_000).to_arrow().to_pylist()
     if not src_records:
         return 0
 
@@ -337,7 +341,7 @@ def migrate_or_copy_category(source_proj: str, target_proj: str, category_name: 
         save_project_categories(target_proj, target_cats)
 
     if mode.lower() == "move":
-        src_table.delete(f"category = '{category_name}'")
+        src_table.delete(f"category = {_sql_quote(category_name)}")
         rebuild_fts(src_table)
         invalidate_table(source_proj)
 

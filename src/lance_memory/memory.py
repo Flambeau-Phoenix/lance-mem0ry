@@ -10,7 +10,7 @@ from typing import Any, Literal
 from .config import load_config, openai_compatible_preset
 from .embedding import Embedder
 from .extraction import Extractor
-from .filters import extract_scope, scope_key, to_lance_where
+from .filters import extract_scope, scope_clauses, scope_key, sql_str, to_lance_where
 from .harness import (
     BudgetTracker, ReadHarness, ReadPolicy, WriteHarness, WritePolicy,
     heuristic_extract,
@@ -261,7 +261,7 @@ class LanceMemory:
         )
 
     def _hash_exists(self, h: str) -> bool:
-        return bool(self.store.memories.search().where(f"hash = '{h}'").limit(1).to_list())
+        return bool(self.store.memories.search().where(f"hash = {sql_str(h)}").limit(1).to_list())
 
     def _mark_supersession(self, rows, ids, scopes):
         for row, mid in zip(rows, ids):
@@ -270,7 +270,7 @@ class LanceMemory:
                 self.store.memories.search(row["vector"], vector_column_name="vector")
                 .metric("cosine")
                 .where(
-                    f"{where} AND lifecycle_state = 'active' AND id != '{mid}' "
+                    f"{where} AND lifecycle_state = 'active' AND id != {sql_str(mid)} "
                     "AND immutable IS NOT TRUE"
                 )
                 .limit(1).to_list()
@@ -437,7 +437,7 @@ class LanceMemory:
         cascade = 0
         if delete_linked:
             linked = self.store.memories.search().where(
-                f"project_id = '{project}' AND replaced_by = '{memory_id}' "
+                f"project_id = {sql_str(project)} AND replaced_by = {sql_str(memory_id)} "
                 "AND immutable IS NOT TRUE"
             ).limit(10_000).to_list()
             for row in linked:
@@ -509,7 +509,7 @@ class AsyncLanceMemory(LanceMemory):
 
 
 def _scope_where(scopes: dict) -> str:
-    return " AND ".join(f"{k} = '{v}'" for k, v in scopes.items() if v is not None) or "1=1"
+    return " AND ".join(scope_clauses(scopes)) or "1=1"
 
 
 def _now_iso() -> str:

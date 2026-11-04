@@ -7,6 +7,8 @@ from typing import Any, Literal
 
 import pyarrow as pa
 
+from .filters import sql_str
+
 
 # ---------- Budget ----------
 
@@ -223,7 +225,7 @@ class MaintenanceHarness:
     def scan_expired(self, *, project: str) -> list[dict]:
         now_iso = datetime.now(timezone.utc).isoformat()
         where = (
-            f"project_id = '{project}' AND expiration_date IS NOT NULL "
+            f"project_id = {sql_str(project)} AND expiration_date IS NOT NULL "
             f"AND expiration_date < to_timestamp('{now_iso}')"
         )
         rows = self.m.store.memories.search().where(where).limit(10_000).to_list()
@@ -233,7 +235,7 @@ class MaintenanceHarness:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=older_than_days)).isoformat()
         rows = (
             self.m.store.memories.search()
-            .where(f"project_id = '{project}' AND created_at < to_timestamp('{cutoff}')")
+            .where(f"project_id = {sql_str(project)} AND created_at < to_timestamp('{cutoff}')")
             .limit(10_000).to_list()
         )
         return [{"id": r["id"], "memory": r["memory"], "created_at": r.get("created_at")} for r in rows]

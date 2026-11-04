@@ -24,7 +24,7 @@ npm run dev
 |---|---|
 | `npm run dev` | Dev server (`tsx server.ts`) |
 | `npm run build` | Production Vite + bundled server |
-| `npm start` | Run built `dist/server.cjs` |
+| `npm start` | Run built `dist/server.mjs` |
 | `npm run lint` | Typecheck |
 
 ## Environment

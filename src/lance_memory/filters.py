@@ -7,6 +7,7 @@ from typing import Any
 _OPERATORS = {"eq", "ne", "gt", "gte", "lt", "lte", "in", "nin", "contains", "icontains"}
 _LOGICAL = {"AND", "OR", "NOT"}
 _TIMESTAMP_FIELDS = {"created_at", "updated_at", "expiration_date"}
+SCOPE_KEYS = ("project_id", "user_id", "agent_id", "run_id", "app_id")
 
 
 def to_lance_where(filters: dict) -> str | None:
@@ -97,6 +98,23 @@ def _lit(value: Any, field: str = "") -> str:
 
 def _escape(s: Any) -> str:
     return str(s).replace("'", "''")
+
+
+def sql_str(value: Any) -> str:
+    """Quote a value as a SQL string literal for a LanceDB filter."""
+    return "'" + _escape(value) + "'"
+
+
+def scope_clauses(scopes: dict) -> list[str]:
+    """Equality clauses for scope filters; column names are allow-listed."""
+    clauses = []
+    for key, value in scopes.items():
+        if value is None:
+            continue
+        if key not in SCOPE_KEYS:
+            raise ValueError(f"Unknown scope key: {key}")
+        clauses.append(f"{key} = {sql_str(value)}")
+    return clauses
 
 
 def extract_scope(filters: dict) -> dict:
