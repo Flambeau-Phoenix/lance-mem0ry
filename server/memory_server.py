@@ -1068,11 +1068,11 @@ def build_mcp():
             # Query table with filters
             clauses = []
             if status_req != "all":
-                clauses.append(f"status = '{status_req}'")
+                clauses.append(f"status = {_sql_str(status_req)}")
             if bucket:
-                clauses.append(f"bucket = '{bucket}'")
+                clauses.append(f"bucket = {_sql_str(bucket)}")
             if category:
-                clauses.append(f"category = '{category}'")
+                clauses.append(f"category = {_sql_str(category)}")
             if verified_req in ("true", "false"):
                 clauses.append(f"verified = {verified_req}")
             pred = " AND ".join(clauses) if clauses else "1=1"

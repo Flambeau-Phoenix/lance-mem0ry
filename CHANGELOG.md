@@ -40,7 +40,8 @@ Earlier history is in the Git log. Versions follow `pyproject.toml`.
   column names allow-listed) before they reach LanceDB filter strings. Previously a
   crafted ID such as `x' OR id != '` could widen a delete or update to every row in
   the table, bypassing the project check and immutable protection. Server admin
-  category filters are escaped the same way.
+  category filters and the record-listing filters (`status`, `bucket`, `category`)
+  in `server/memory_server.py` are escaped the same way.
 - `server/init_project_memories.py` no longer seeds a `default` partition when
   `PROJECT_MEMORY_PROJECTS` is unset, matching the documented blank-slate install.
 - `lance_memory.mcp_server` (the `lance-memory-mcp` entry point) imports on a fresh
