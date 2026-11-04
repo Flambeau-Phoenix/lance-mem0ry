@@ -191,6 +191,11 @@ live in [`templates/AGENTS.md`](templates/AGENTS.md).
 
 ## Admin console
 
+<p align="center">
+  <img src="docs/images/web-panel-project.png" alt="The web panel showing the example_project partition: a table of seven memories with status, symbol, category, text and embedding columns" width="900"><br>
+  <em>A project in the web panel: the bundled <a href="examples/">example project</a> with its records, categories and verified/blueprint status.</em>
+</p>
+
 The Streamlit console (`server/admin_app.py`, default port `8767`) provides:
 
 1. **Category management.** A per-project catalog with descriptions, buckets and live

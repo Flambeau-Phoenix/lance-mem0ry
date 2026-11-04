@@ -7,6 +7,10 @@ maintenance/dedup lab, FastMCP hub).
 
 *A fresh install: no projects, memories or sample data.*
 
+![The web panel showing the example_project partition: a table of seven memories with status, symbol, category, text and embedding columns](../docs/images/web-panel-project.png)
+
+*A project in the panel: the bundled [example project](../examples/README.md) loaded into the table view.*
+
 ## Prerequisites
 
 - Node.js 20+

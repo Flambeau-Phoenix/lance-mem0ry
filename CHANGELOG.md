@@ -6,8 +6,9 @@ Earlier history is in the Git log. Versions follow `pyproject.toml`.
 
 ### Added
 
-- Web panel screenshot (`docs/images/web-panel-home.png`) on the README front page and in
-  `web-panel/README.md`.
+- Web panel screenshots on the README front page and in `web-panel/README.md`: a fresh
+  install (`docs/images/web-panel-home.png`) and the bundled example project
+  (`docs/images/web-panel-project.png`).
 - **Claude Code hooks** (`templates/hooks/`): load recent project memory at
   `SessionStart` and write a small unverified checkpoint at `PreCompact` and
   `SessionEnd`. Standard library only, fail-soft, read-only mode, project ID from

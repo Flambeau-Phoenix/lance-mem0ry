@@ -8,6 +8,8 @@ embedding server (vectors here are synthetic unit vectors, not real model output
 
 ## What is Included
 
+To see how this project looks in the web panel, see the screenshot in the [web panel README](../web-panel/README.md).
+
 | File / Folder | Format | Description |
 |---|---|---|
 | [`example_database_export.json`](./example_database_export.json) | Standalone JSON | Full project export: metadata, category registry, and 7 sample memory records with 768-dim float vectors. Ideal for API mocking and UI prototyping. |
