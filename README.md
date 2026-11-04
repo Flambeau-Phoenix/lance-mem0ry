@@ -129,6 +129,11 @@ inspect_memory_system(action="categories", project_id="<PROJECT_ID>")
 
 Full tool and schema reference: [docs/MEMORY_SYSTEM_REFERENCE.md](docs/MEMORY_SYSTEM_REFERENCE.md).
 
+In the Mem0-compatible Python library, `add(..., immutable=True)` protects a memory
+from updates, deletion, and automatic mutations. Direct `update()` and `delete()`
+raise `ValueError`; batch operations, `delete_all()`, and linked deletion cascades
+skip protected rows and report only the memories actually changed or deleted.
+
 ## Category governance & agent lifecycle
 
 Every project partition contains a `categories.json` registry defining approved

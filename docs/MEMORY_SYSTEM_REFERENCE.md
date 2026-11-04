@@ -144,10 +144,19 @@ LanceDB manages two distinct tables per project partition: the primary architect
 | `created_at` | `str` | Creation timestamp. |
 | `updated_at` | `str` | Last update timestamp. |
 | `expiration_date` | `str \| None` | Optional TTL timestamp for automatic sunsetting. |
-| `immutable` | `bool` | If true, updates and automatic mutations are blocked. |
+| `immutable` | `bool` | If true, updates, deletion, and automatic mutations are blocked. |
 | `lifecycle_state` | `str` | State of the record (`active`, `superseded`). |
 | `score` | `float` | Vector similarity score returned during search. |
 | `vector` | `Vector(768)` | Ollama dense embedding vector. |
+
+For the Mem0-compatible `LanceMemory` library, direct `update()` and `delete()`
+raise `ValueError` for immutable rows after checking the project scope. The REST
+PATCH and DELETE routes retain their existing HTTP 404 mapping for these errors.
+`batch_update()` and `batch_delete()` skip immutable rows and count successful
+operations. `delete_all()` and `delete_linked=True` preserve immutable rows, as do
+automatic supersession and store mutations used by maintenance. Rows with a legacy
+NULL `immutable` flag remain mutable. Immutability does not disable expiration
+filtering; an expired protected row remains stored but is hidden by default.
 
 ---
 

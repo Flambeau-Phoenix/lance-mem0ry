@@ -28,6 +28,12 @@ Earlier history is in the Git log. Versions follow `pyproject.toml`.
 
 ### Fixed
 
+- Immutable memories now reject direct updates and deletes, including REST PATCH
+  and DELETE requests. Batches skip protected rows and count successful operations;
+  scoped deletion, linked cascades, automatic supersession, and low-level maintenance
+  writes preserve them. Delete history now receives the row's project scope.
+  ([#5](https://github.com/Flambeau-Phoenix/lance-mem0ry/issues/5), reported by
+  [mattabate](https://github.com/mattabate))
 - `pandas` and `requests` are now declared dependencies. `server/memory_server.py`
   imports `requests` and uses `to_pandas()` for recent listings, so a fresh install
   could not start the server or list recent memories. Streamlit is a new `admin` extra

@@ -20,6 +20,10 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+class ImmutableMemoryError(ValueError):
+    """Raised when a mutation targets an immutable memory."""
+
+
 class LanceStore:
     def __init__(self, uri: str, table: str = "memories", metric: str = "cosine", dims: int = 768):
         self.uri = uri
@@ -103,6 +107,8 @@ class LanceStore:
         existing = self.get_memory(memory_id)
         if not existing:
             return False
+        if existing.get("immutable"):
+            raise ImmutableMemoryError(f"Memory {memory_id} is immutable")
         payload = {"updated_at": _utcnow()}
         for k, v in updates.items():
             if k == "metadata" and isinstance(v, dict):
@@ -123,6 +129,8 @@ class LanceStore:
         existing = self.get_memory(memory_id)
         if not existing:
             return False
+        if existing.get("immutable"):
+            raise ImmutableMemoryError(f"Memory {memory_id} is immutable")
         self.memories.delete(f"id = '{memory_id}'")
         return True
 
@@ -130,7 +138,7 @@ class LanceStore:
         clauses = [f"{k} = '{v}'" for k, v in scopes.items() if v is not None]
         if not clauses:
             raise ValueError("delete_by_scope requires at least one scope filter")
-        where = " AND ".join(clauses)
+        where = " AND ".join([*clauses, "immutable IS NOT TRUE"])
         count = len(self.memories.search().where(where).limit(10_000).to_list())
         self.memories.delete(where)
         return count

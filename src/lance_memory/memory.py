@@ -17,7 +17,7 @@ from .harness import (
 )
 from .reranker import Reranker
 from .retrieval import estimate_tokens, multi_signal_search, trim_to_budget
-from .store import LanceStore
+from .store import ImmutableMemoryError, LanceStore
 
 
 ALLOWED_MEMORY_TYPES = {None, "procedural_memory"}
@@ -269,7 +269,10 @@ class LanceMemory:
             hits = (
                 self.store.memories.search(row["vector"], vector_column_name="vector")
                 .metric("cosine")
-                .where(f"{where} AND lifecycle_state = 'active' AND id != '{mid}'")
+                .where(
+                    f"{where} AND lifecycle_state = 'active' AND id != '{mid}' "
+                    "AND immutable IS NOT TRUE"
+                )
                 .limit(1).to_list()
             )
             if hits and hits[0].get("_distance", 1.0) < 0.05:
@@ -406,6 +409,8 @@ class LanceMemory:
         existing = self.store.get_memory(memory_id)
         if not existing or existing.get("project_id") != project:
             raise ValueError(f"Memory {memory_id} not found")
+        if existing.get("immutable"):
+            raise ImmutableMemoryError(f"Memory {memory_id} is immutable")
         updates: dict[str, Any] = {}
         if text is not None:
             updates["memory"] = text
@@ -427,15 +432,23 @@ class LanceMemory:
         existing = self.store.get_memory(memory_id)
         if not existing or existing.get("project_id") != project:
             raise ValueError(f"Memory {memory_id} not found")
+        if existing.get("immutable"):
+            raise ImmutableMemoryError(f"Memory {memory_id} is immutable")
         cascade = 0
         if delete_linked:
             linked = self.store.memories.search().where(
-                f"project_id = '{project}' AND replaced_by = '{memory_id}'"
+                f"project_id = '{project}' AND replaced_by = '{memory_id}' "
+                "AND immutable IS NOT TRUE"
             ).limit(10_000).to_list()
             for row in linked:
                 self.store.delete_memory(row["id"]); cascade += 1
         self.store.delete_memory(memory_id)
-        self.store.log_history(memory_id, "DELETE", old_memory=existing["memory"])
+        self.store.log_history(
+            memory_id, "DELETE", old_memory=existing["memory"],
+            scopes={k: existing.get(k) for k in (
+                "project_id", "user_id", "agent_id", "run_id", "app_id"
+            )},
+        )
         return {"message": "Memory deleted successfully!", "cascade_count": cascade}
 
     def delete_all(self, *, project: str | None = None, confirm: bool = False, **scopes) -> dict:
@@ -445,7 +458,7 @@ class LanceMemory:
         if not secondary and not confirm:
             raise ValueError(
                 "delete_all with only project requires confirm=True "
-                "(this deletes every memory in the partition)"
+                "(this deletes every mutable memory in the partition)"
             )
         count = self.store.delete_by_scope(**scopes)
         return {"message": f"Deleted {count} memories"}
@@ -453,19 +466,28 @@ class LanceMemory:
     def batch_update(self, memories: list[dict], *, project: str | None = None) -> dict:
         if len(memories) > 1000:
             raise ValueError("Maximum of 1000 memories can be updated in a single request")
+        updated = 0
         for m in memories:
-            self.update(m["memory_id"], project=project, text=m.get("text"), metadata=m.get("metadata"))
-        return {"message": f"Successfully updated {len(memories)} memories"}
+            try:
+                self.update(
+                    m["memory_id"], project=project, text=m.get("text"), metadata=m.get("metadata")
+                )
+                updated += 1
+            except ImmutableMemoryError:
+                continue
+        return {"message": f"Successfully updated {updated} memories"}
 
     def batch_delete(self, memories: list[dict], *, project: str | None = None) -> dict:
         if len(memories) > 1000:
             raise ValueError("Maximum of 1000 memories can be deleted in a single request")
+        deleted = 0
         for m in memories:
             try:
                 self.delete(m["memory_id"], project=project)
+                deleted += 1
             except ValueError:
                 continue
-        return {"message": f"Successfully deleted {len(memories)} memories"}
+        return {"message": f"Successfully deleted {deleted} memories"}
 
     def _resolve_project(self, project: str | None) -> str:
         resolved = (project or self.config.get("project") or "").strip()
