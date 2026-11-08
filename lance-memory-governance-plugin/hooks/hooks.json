@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"import(require('node:url').pathToFileURL(process.env.PLUGIN_ROOT + '/hooks/session-start.js').href)\"",
+            "timeout": 5,
+            "statusMessage": "Resolving Lance Memory project"
+          }
+        ]
+      }
+    ]
+  }
+}

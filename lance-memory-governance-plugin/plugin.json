@@ -1,0 +1,16 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "lance-memory-governance",
+  "version": "0.2.0",
+  "description": "Resolve the current checkout to a Lance Memory partition and guide project-scoped recall and handoffs.",
+  "extensions": {
+    "com.openai": {
+      "hooks": "./hooks/hooks.json",
+      "interface": {
+        "displayName": "Lance Memory",
+        "shortDescription": "Project memory across coding sessions and IDEs",
+        "category": "Productivity"
+      }
+    }
+  }
+}

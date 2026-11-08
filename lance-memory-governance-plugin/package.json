@@ -1,0 +1,9 @@
+{
+  "name": "lance-memory-governance-plugin",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "exports": { ".": "./opencode.js", "./server": "./opencode.js" },
+  "scripts": { "project": "node project.js", "test": "node --test" }
+}

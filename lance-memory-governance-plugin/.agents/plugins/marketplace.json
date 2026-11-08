@@ -1,0 +1,12 @@
+{
+  "name": "lance-memory-local",
+  "interface": { "displayName": "Lance Memory" },
+  "plugins": [
+    {
+      "name": "lance-memory-governance",
+      "source": { "source": "local", "path": "./" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Productivity"
+    }
+  ]
+}
